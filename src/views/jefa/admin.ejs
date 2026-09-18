@@ -99,15 +99,28 @@
 
   <div class="panel">
     <h3>Usuarios</h3>
+    <p class="ayuda">Puedes cambiar el usuario de inicio de sesión, el nombre y a qué almacén pertenece. Varios usuarios pueden compartir el mismo almacén (por ejemplo, dos cajas).</p>
     <table class="tabla">
-      <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Almacén</th><th>Estado</th><th></th></tr></thead>
+      <thead><tr><th>Usuario y nombre</th><th>Rol</th><th>Almacén</th><th>Estado</th><th></th></tr></thead>
       <tbody>
         <% usuarios.forEach(u => { %>
           <tr>
-            <td><%= u.usuario %></td>
-            <td><%= u.nombre %></td>
-            <td><%= u.rol %></td>
-            <td><%= u.almacen_nombre || '—' %></td>
+            <td colspan="3">
+              <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/editar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <input type="text" name="usuario" value="<%= u.usuario %>" style="width:140px;padding:6px 8px;border:1px solid var(--line);border-radius:5px" aria-label="Usuario">
+                <input type="text" name="nombre" value="<%= u.nombre %>" style="width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:5px" aria-label="Nombre">
+                <% if (u.rol === 'almacen') { %>
+                  <select name="almacen_id" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                    <% almacenes.forEach(a => { %>
+                      <option value="<%= a.id %>" <%= a.id === u.almacen_id ? 'selected' : '' %>><%= a.nombre %></option>
+                    <% }) %>
+                  </select>
+                <% } else { %>
+                  <span class="chip almacen"><%= u.rol %></span>
+                <% } %>
+                <button class="btn linea mini" type="submit">Guardar</button>
+              </form>
+            </td>
             <td><%= u.activo ? 'Activo' : 'Inactivo' %></td>
             <td class="n">
               <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/clave" style="display:inline"

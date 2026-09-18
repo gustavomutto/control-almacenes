@@ -44,6 +44,15 @@ Cada almacén se configura en hoja carta o en ticket POS térmico (80mm o 58mm) 
 | Universal Viviana | Valledupar | Hoja carta |
 | PVElectricos | Valledupar | Hoja carta |
 
+## Varios usuarios en un mismo almacén
+
+Un almacén puede tener los usuarios que necesite (por ejemplo dos cajas). Todos los usuarios
+del mismo almacén comparten **el mismo inventario, el mismo catálogo y la misma numeración de
+facturas**, y cada factura queda marcada con el usuario que la hizo. Los inventarios de
+almacenes distintos están completamente separados: uno no ve ni afecta los productos del otro.
+
+El cierre de caja es **por almacén y por día**: si hay dos cajas, el cierre suma lo de ambas.
+
 ## Sedes / regiones
 
 Un almacén pertenece a una sede (por ejemplo Valledupar). Desde «Almacenes y usuarios» se
@@ -60,6 +69,16 @@ cambiar el costo después no altera las facturas viejas.
     ganancia = (lo cobrado sin IVA y ya con el descuento) − (costo de la mercancía vendida)
 
 Los gastos se muestran **aparte**, nunca se restan solos de esa ganancia.
+
+## Velocidad
+
+- Las páginas se envían comprimidas (gzip): pesan ~60% menos.
+- El CSS y el JavaScript se guardan en el navegador por 30 días y llevan un número de versión
+  en la dirección (`estilo.css?v=...`), así que **solo se descargan una vez** y al publicar una
+  versión nueva el navegador la toma sin que nadie tenga que borrar caché. Navegar entre
+  pestañas pasó de 4 peticiones de red a 1.
+- Los reportes mensuales filtran por rango de fechas (usan el índice de la base de datos) en
+  vez de convertir cada fila a texto.
 
 ## Estructura del proyecto
 

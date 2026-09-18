@@ -1,6 +1,8 @@
 require('dotenv').config();
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 
@@ -12,12 +14,31 @@ const { requireLogin } = require('./middleware/auth');
 
 const app = express();
 
+app.disable('x-powered-by');
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
 app.set('trust proxy', 1); // Railway está detrás de un proxy
+
+// Comprime las páginas antes de enviarlas: menos datos por la red.
+app.use(compression());
+app.use(express.urlencoded({ extended: true }));
+
+// "Sello" de esta versión del programa. Va pegado a las direcciones del CSS y del JS
+// (estilo.css?v=SELLO) para que el navegador los guarde mucho tiempo sin volver a
+// pedirlos, y al mismo tiempo reciba los nuevos apenas se publique una versión.
+const SELLO =
+  process.env.RAILWAY_DEPLOYMENT_ID ||
+  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  crypto.randomBytes(6).toString('hex');
+app.locals.v = SELLO.slice(0, 12);
+
+app.use(
+  express.static(path.join(__dirname, '..', 'public'), {
+    maxAge: '30d',
+    etag: true,
+    lastModified: true,
+  })
+);
 
 app.use(
   session({
@@ -30,6 +51,7 @@ app.use(
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     },
   })
 );

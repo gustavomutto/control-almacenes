@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><%= doc.tipo === 'factura' ? 'Factura' : 'Cotización' %> N° <%= doc.numero %></title>
-<link rel="stylesheet" href="/css/estilo.css">
-<link rel="stylesheet" href="/css/ticket.css">
+<link rel="stylesheet" href="/css/estilo.css?v=<%= v %>">
+<link rel="stylesheet" href="/css/ticket.css?v=<%= v %>">
+<link rel="icon" href="data:,">
 <style>
 <%- papelCss %>
 </style>

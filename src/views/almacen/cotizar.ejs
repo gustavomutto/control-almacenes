@@ -63,6 +63,6 @@ window.APP = {
   materialesM2: <%- JSON.stringify(materialesM2.map(m => ({ clave: m.clave, nombre: m.nombre, texto: m.texto }))) %>
 };
 </script>
-<script src="/js/cotizar.js"></script>
+<script src="/js/cotizar.js?v=<%= v %>"></script>
 </body>
 </html>

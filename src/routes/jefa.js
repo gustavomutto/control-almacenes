@@ -119,32 +119,33 @@ router.get('/reporte', async (req, res) => {
   const ids = filtrados.map((a) => a.id);
 
   const cond = ids.length ? 'AND almacen_id = ANY($2::int[])' : '';
-  const params = ids.length ? [mes, ids] : [mes];
+  const primerDia = `${mes}-01`;
+  const params = ids.length ? [primerDia, ids] : [primerDia];
 
   const [porAlmacen, porDia, gastos, unidades, unidadesAlmacen] = await Promise.all([
     pool.query(
       `SELECT almacen_id, COALESCE(SUM(total),0) AS venta, COALESCE(SUM(costo_total),0) AS costo,
               COALESCE(SUM(margen),0) AS margen, COUNT(*) AS facturas
-       FROM documentos WHERE to_char(fecha,'YYYY-MM') = $1 AND tipo = 'factura' AND anulada = false ${cond}
+       FROM documentos WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month') AND tipo = 'factura' AND anulada = false ${cond}
        GROUP BY almacen_id`,
       params
     ),
     pool.query(
       `SELECT fecha, COALESCE(SUM(total),0) AS venta, COALESCE(SUM(costo_total),0) AS costo,
               COALESCE(SUM(margen),0) AS margen
-       FROM documentos WHERE to_char(fecha,'YYYY-MM') = $1 AND tipo = 'factura' AND anulada = false ${cond}
+       FROM documentos WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month') AND tipo = 'factura' AND anulada = false ${cond}
        GROUP BY fecha ORDER BY fecha`,
       params
     ),
     pool.query(
       `SELECT almacen_id, COALESCE(SUM(valor),0) AS total FROM gastos
-       WHERE to_char(fecha,'YYYY-MM') = $1 ${cond} GROUP BY almacen_id`,
+       WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month') ${cond} GROUP BY almacen_id`,
       params
     ),
     pool.query(
       `SELECT i.descripcion AS material, SUM(i.cantidad) AS cantidad, SUM(i.total) AS venta
        FROM documento_items i JOIN documentos d ON d.id = i.documento_id
-       WHERE to_char(d.fecha,'YYYY-MM') = $1 AND d.tipo = 'factura' AND d.anulada = false
+       WHERE d.fecha >= $1::date AND d.fecha < ($1::date + INTERVAL '1 month') AND d.tipo = 'factura' AND d.anulada = false
              ${ids.length ? 'AND d.almacen_id = ANY($2::int[])' : ''}
        GROUP BY i.descripcion ORDER BY cantidad DESC LIMIT 50`,
       params
@@ -152,7 +153,7 @@ router.get('/reporte', async (req, res) => {
     pool.query(
       `SELECT d.almacen_id, COALESCE(SUM(i.cantidad),0) AS unidades
        FROM documento_items i JOIN documentos d ON d.id = i.documento_id
-       WHERE to_char(d.fecha,'YYYY-MM') = $1 AND d.tipo = 'factura' AND d.anulada = false
+       WHERE d.fecha >= $1::date AND d.fecha < ($1::date + INTERVAL '1 month') AND d.tipo = 'factura' AND d.anulada = false
              ${ids.length ? 'AND d.almacen_id = ANY($2::int[])' : ''}
        GROUP BY d.almacen_id`,
       params
@@ -205,13 +206,14 @@ router.get('/gastos', async (req, res) => {
   const ids = filtrados.map((a) => a.id);
 
   const cond = ids.length ? 'AND g.almacen_id = ANY($2::int[])' : '';
-  const params = ids.length ? [mes, ids] : [mes];
+  const primerDia = `${mes}-01`;
+  const params = ids.length ? [primerDia, ids] : [primerDia];
 
   const detalle = await pool.query(
     `SELECT g.*, a.nombre AS almacen_nombre, r.nombre AS region_nombre
      FROM gastos g JOIN almacenes a ON a.id = g.almacen_id
      LEFT JOIN regiones r ON r.id = a.region_id
-     WHERE to_char(g.fecha,'YYYY-MM') = $1 ${cond}
+     WHERE g.fecha >= $1::date AND g.fecha < ($1::date + INTERVAL '1 month') ${cond}
      ORDER BY g.fecha DESC, a.nombre, g.creado_en DESC`,
     params
   );
@@ -410,6 +412,47 @@ router.post('/admin/usuarios', soloAdmin, async (req, res) => {
   res.redirect(
     `/jefa/admin?ok=${encodeURIComponent('Usuario creado.')}&u=${encodeURIComponent(limpio)}&pass=${encodeURIComponent(pass)}`
   );
+});
+
+// Cambiar el usuario de inicio de sesión, el nombre visible y el almacén.
+router.post('/admin/usuarios/:id/editar', soloAdmin, async (req, res) => {
+  const { usuario, nombre, almacen_id } = req.body;
+  const limpio = (usuario || '').trim().toLowerCase();
+
+  if (!limpio || !nombre || !nombre.trim()) {
+    return res.redirect('/jefa/admin?error=' + encodeURIComponent('El usuario y el nombre no pueden quedar vacíos.'));
+  }
+  if (!/^[a-z0-9._-]+$/.test(limpio)) {
+    return res.redirect(
+      '/jefa/admin?error=' +
+        encodeURIComponent('El usuario solo puede tener letras sin tildes, números, punto, guion o guion bajo.')
+    );
+  }
+
+  const { rows } = await pool.query('SELECT rol, almacen_id FROM usuarios WHERE id = $1', [req.params.id]);
+  if (rows.length === 0) return res.redirect('/jefa/admin?error=' + encodeURIComponent('Usuario no encontrado.'));
+
+  // Solo el personal de almacén tiene almacén; jefa y admin no.
+  const nuevoAlmacen = rows[0].rol === 'almacen' ? almacen_id || rows[0].almacen_id : null;
+
+  try {
+    await pool.query('UPDATE usuarios SET usuario = $1, nombre = $2, almacen_id = $3 WHERE id = $4', [
+      limpio,
+      nombre.trim(),
+      nuevoAlmacen,
+      req.params.id,
+    ]);
+  } catch (err) {
+    return res.redirect('/jefa/admin?error=' + encodeURIComponent(`El usuario «${limpio}» ya está en uso.`));
+  }
+
+  // Si se cambió a sí mismo, refrescamos lo que quedó guardado en su sesión.
+  if (Number(req.params.id) === req.session.usuario.id) {
+    req.session.usuario.usuario = limpio;
+    req.session.usuario.nombre = nombre.trim();
+  }
+
+  res.redirect('/jefa/admin?ok=' + encodeURIComponent('Usuario actualizado.'));
 });
 
 router.post('/admin/usuarios/:id/clave', soloAdmin, async (req, res) => {
