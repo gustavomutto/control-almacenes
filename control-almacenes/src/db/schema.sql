@@ -1,11 +1,22 @@
 -- Esquema: control de materiales, ventas, gastos y rentabilidad por almacén
 
+-- Región: agrupa varios almacenes (ej: Valledupar). Un almacén pertenece a una región (opcional).
+CREATE TABLE IF NOT EXISTS regiones (
+  id SERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL UNIQUE,
+  activo BOOLEAN NOT NULL DEFAULT true,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS almacenes (
   id SERIAL PRIMARY KEY,
   nombre TEXT NOT NULL UNIQUE,
   activo BOOLEAN NOT NULL DEFAULT true,
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Si la tabla almacenes ya existía de antes (instalaciones previas), le agregamos la columna.
+ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS region_id INTEGER REFERENCES regiones(id);
 
 -- rol: 'almacen' (personal de un almacén, solo ve/edita el suyo)
 --      'jefa'    (ve el consolidado de todos los almacenes, solo lectura)
@@ -72,3 +83,4 @@ CREATE TABLE IF NOT EXISTS gastos (
 CREATE INDEX IF NOT EXISTS idx_ventas_almacen_fecha ON ventas (almacen_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_gastos_almacen_fecha ON gastos (almacen_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_materiales_almacen ON materiales (almacen_id);
+CREATE INDEX IF NOT EXISTS idx_almacenes_region ON almacenes (region_id);

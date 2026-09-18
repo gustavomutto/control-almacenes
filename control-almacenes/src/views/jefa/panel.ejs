@@ -5,7 +5,7 @@
     <div class="fila-filtro">
       <div>
         <h2 style="margin-bottom:2px">Resumen del día</h2>
-        <p class="ayuda" style="margin:0">Todos los almacenes</p>
+        <p class="ayuda" style="margin:0">Todas las regiones y almacenes</p>
       </div>
       <form method="get" action="/jefa" style="margin-left:auto">
         <label class="campo">Ver fecha <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
@@ -13,26 +13,72 @@
     </div>
 
     <div class="tarjetas">
-      <div class="tarjeta venta"><span>Vendido hoy (los 4)</span><strong><%= fmt(totales.venta) %></strong></div>
+      <div class="tarjeta venta"><span>Vendido hoy (todos)</span><strong><%= fmt(totales.venta) %></strong></div>
       <div class="tarjeta"><span>Costo del material</span><strong><%= fmt(totales.costo) %></strong></div>
       <div class="tarjeta margen"><span>Ganancia real de hoy</span><strong><%= fmt(totales.margen) %></strong></div>
       <div class="tarjeta gastos"><span>Gastos de hoy</span><strong><%= fmt(totales.gastos) %></strong></div>
+      <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalUnidadesHoy) %></strong></div>
     </div>
 
+    <% regiones.forEach(region => { %>
+      <h3 style="margin-top:18px"><%= region.nombre %></h3>
+      <table class="tabla">
+        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+        <tbody>
+          <% region.filas.forEach(f => { %>
+            <tr>
+              <td><%= f.almacen.nombre %></td>
+              <td class="n"><%= fmt(f.venta) %></td>
+              <td class="n"><%= fmt(f.costo) %></td>
+              <td class="n"><%= fmt(f.margen) %></td>
+              <td class="n"><%= fmt(f.gastos) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% }) %>
+
+    <% if (sinRegion.length > 0) { %>
+      <h3 style="margin-top:18px">Sin región asignada</h3>
+      <table class="tabla">
+        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+        <tbody>
+          <% sinRegion.forEach(f => { %>
+            <tr>
+              <td><%= f.almacen.nombre %></td>
+              <td class="n"><%= fmt(f.venta) %></td>
+              <td class="n"><%= fmt(f.costo) %></td>
+              <td class="n"><%= fmt(f.margen) %></td>
+              <td class="n"><%= fmt(f.gastos) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <% if (regiones.length === 0 && sinRegion.length === 0) { %>
+      <div class="vacio">Todavía no hay almacenes creados.</div>
+    <% } %>
+  </div>
+
+  <div class="panel">
+    <h3>Mercancía vendida hoy, por unidad</h3>
     <table class="tabla">
-      <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+      <thead><tr><th>Almacén</th><th>Material</th><th class="n">Cantidad</th><th class="n">Vendido</th></tr></thead>
       <tbody>
-        <% filas.forEach(f => { %>
+        <% unidadesHoy.forEach(u => { %>
           <tr>
-            <td><span class="chip almacen"><%= f.almacen.nombre %></span></td>
-            <td class="n"><%= fmt(f.venta) %></td>
-            <td class="n"><%= fmt(f.costo) %></td>
-            <td class="n"><%= fmt(f.margen) %></td>
-            <td class="n"><%= fmt(f.gastos) %></td>
+            <td><span class="chip almacen"><%= u.almacen_nombre %></span></td>
+            <td><%= u.material %></td>
+            <td class="n"><%= fmtCant(u.cantidad) %></td>
+            <td class="n"><%= fmt(u.venta) %></td>
           </tr>
         <% }) %>
-        <% if (filas.length === 0) { %><tr><td colspan="5" class="vacio">Todavía no hay almacenes creados.</td></tr><% } %>
+        <% if (unidadesHoy.length === 0) { %><tr><td colspan="4" class="vacio">Sin ventas registradas este día.</td></tr><% } %>
       </tbody>
+      <% if (unidadesHoy.length > 0) { %>
+      <tfoot><tr><td colspan="2">Total</td><td class="n"><%= fmtCant(totalUnidadesHoy) %></td><td class="n"><%= fmt(totales.venta) %></td></tr></tfoot>
+      <% } %>
     </table>
   </div>
 </main>

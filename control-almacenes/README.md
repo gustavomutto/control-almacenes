@@ -10,28 +10,59 @@ sin que nadie tenga que descargar ni reenviar archivos.
   - Sube el catálogo de materiales: precio de costo (lo que le cuesta) y precio de venta.
   - Registra cada venta del día (elige el material y la cantidad; el sistema calcula el margen solo).
   - Registra los gastos del día (arriendo, nómina, transporte, etc.).
-- **Tu jefa** tiene un usuario de solo lectura que consolida los 4 almacenes: ve el resumen de hoy
-  y un reporte mensual con la **ganancia real total del mes** (la suma de las ventas menos el costo
-  del material, sin descontar los gastos) y, aparte, **el total de gastos del mes** — tal como lo pediste.
-- **Administrador** (para ti): puede crear almacenes nuevos y usuarios, además de ver todo lo de la jefa.
+- **Tu jefa** tiene un usuario de solo lectura que consolida todos los almacenes, agrupados por
+  región: ve el resumen de hoy y un reporte mensual con la **ganancia real total del mes** (la suma
+  de las ventas menos el costo del material, sin descontar los gastos) y, aparte, **el total de
+  gastos del mes** — tal como lo pediste.
+- **Administrador** (para ti): puede crear regiones, almacenes nuevos y usuarios, además de ver
+  todo lo de la jefa.
 
 El margen de cada venta se calcula así: `(precio de venta − precio de costo) × cantidad`.
 Ese es el número que ves día a día como "lo que te queda". Los gastos se muestran siempre
 en una columna aparte, nunca se restan automáticamente de la ganancia.
 
+## Regiones
+
+Un almacén puede pertenecer a una región (ej: Valledupar). En "Mis datos" → "Almacenes y
+usuarios" (usuario administrador) puedes crear una región nueva y, al crear un almacén, elegir
+a qué región pertenece. Tanto el resumen del día como el reporte mensual de la jefa agrupan los
+almacenes por región.
+
+Los 4 almacenes originales ya están renombrados y agrupados en la región **Valledupar**:
+
+| Nombre anterior | Nombre actual |
+|---|---|
+| Almacén 1 | PVC La 11 |
+| Almacén 2 | Techos PVC |
+| Almacén 3 | Universal Viviana |
+| Almacén 4 | PVElectricos |
+
+Los usuarios de inicio de sesión de cada almacén (`almacen1`, `almacen2`, etc.) no cambiaron,
+solo el nombre visible.
+
+## Informes
+
+- **Informe de gastos** (pestaña "Gastos", jefa/administrador): el detalle de cada gasto
+  registrado, filtrable por mes, región o almacén, con subtotales por región, por almacén y el
+  total general.
+- **Mercancía vendida por unidad**: tanto el panel del almacén (del día) como el panel y el
+  reporte mensual de la jefa muestran cuántas unidades de cada material se vendieron, no solo
+  el valor en dinero.
+
 ## Estructura del proyecto
 
 ```
 src/
-  server.js          servidor principal (Express)
-  db/schema.sql       estructura de la base de datos (Postgres)
-  db/migrate.js        crea las tablas
-  db/seed.js           crea los almacenes y usuarios iniciales
-  routes/auth.js        login / logout
-  routes/almacen.js     panel del almacén (materiales, ventas, gastos)
-  routes/jefa.js         panel consolidado, reporte mensual, administración
-  views/                 páginas (EJS)
-public/css/estilo.css    estilos
+  server.js                      servidor principal (Express)
+  db/schema.sql                   estructura de la base de datos (Postgres)
+  db/migrate.js                    crea las tablas
+  db/actualizar_valledupar.js       renombra los 4 almacenes iniciales y crea la región Valledupar (seguro de correr varias veces)
+  db/seed.js                        crea los almacenes y usuarios iniciales
+  routes/auth.js                    login / logout
+  routes/almacen.js                 panel del almacén (materiales, ventas, gastos, unidades vendidas)
+  routes/jefa.js                     panel consolidado por región, reporte mensual, informe de gastos, administración
+  views/                             páginas (EJS)
+public/css/estilo.css                estilos
 ```
 
 ## Desplegar en Railway (recomendado — así tu jefa lo ve desde el iPad)
@@ -45,9 +76,11 @@ public/css/estilo.css    estilos
      https://1password.com/password-generator o similar).
    - `NODE_ENV=production`
    - Opcional: `SEED_ALMACENES` con los nombres de tus almacenes separados por coma
-     (ej: `Almacén 1,Almacén 2,Almacén 3,Almacén 4`). Solo se usa la primera vez.
-4. El `Procfile` ya incluye la migración automática (`release: node src/db/migrate.js`)
-   antes de cada despliegue, y el arranque del servidor (`web: node src/server.js`).
+     (ej: `PVC La 11,Techos PVC,Universal Viviana,PVElectricos`). Solo se usa la primera vez
+     que no exista ningún almacén con ese nombre.
+4. El `Procfile` ya incluye, antes de cada despliegue: crear las tablas, renombrar/agrupar los
+   4 almacenes iniciales en la región Valledupar (no hace nada si ya se aplicó antes), y crear
+   los usuarios iniciales si hacen falta. Luego arranca el servidor.
 5. Después del primer despliegue, corre una sola vez (desde la pestaña "Shell" del servicio
    en Railway, o con `railway run npm run seed`):
    ```

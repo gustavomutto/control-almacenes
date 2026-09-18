@@ -10,17 +10,41 @@
   <% } %>
 
   <div class="panel">
-    <h3>Almacenes</h3>
+    <h3>Regiones</h3>
+    <p class="ayuda">Agrupan varios almacenes (ej: Valledupar). Crea una región y luego asígnala a cada almacén.</p>
     <table class="tabla">
       <thead><tr><th>Nombre</th><th>Estado</th></tr></thead>
       <tbody>
+        <% regiones.forEach(r => { %>
+          <tr><td><%= r.nombre %></td><td><%= r.activo ? 'Activa' : 'Inactiva' %></td></tr>
+        <% }) %>
+        <% if (regiones.length === 0) { %><tr><td colspan="2" class="vacio">Todavía no hay regiones.</td></tr><% } %>
+      </tbody>
+    </table>
+    <form method="post" action="/jefa/admin/regiones" style="margin-top:16px;display:flex;gap:10px;align-items:end">
+      <label class="campo" style="flex:1">Nueva región <input type="text" name="nombre" placeholder="Ej: Valledupar" required></label>
+      <button class="btn prim" type="submit">Crear región</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Almacenes</h3>
+    <table class="tabla">
+      <thead><tr><th>Nombre</th><th>Región</th><th>Estado</th></tr></thead>
+      <tbody>
         <% almacenes.forEach(a => { %>
-          <tr><td><%= a.nombre %></td><td><%= a.activo ? 'Activo' : 'Inactivo' %></td></tr>
+          <tr><td><%= a.nombre %></td><td><%= a.region_nombre || '—' %></td><td><%= a.activo ? 'Activo' : 'Inactivo' %></td></tr>
         <% }) %>
       </tbody>
     </table>
-    <form method="post" action="/jefa/admin/almacenes" style="margin-top:16px;display:flex;gap:10px;align-items:end">
+    <form method="post" action="/jefa/admin/almacenes" style="margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
       <label class="campo" style="flex:1">Nuevo almacén <input type="text" name="nombre" placeholder="Ej: Almacén 5" required></label>
+      <label class="campo">Región
+        <select name="region_id">
+          <option value="">Sin región</option>
+          <% regiones.forEach(r => { %><option value="<%= r.id %>"><%= r.nombre %></option><% }) %>
+        </select>
+      </label>
       <button class="btn prim" type="submit">Crear almacén</button>
     </form>
   </div>
@@ -65,7 +89,7 @@
       <div id="campoAlmacen" class="rejilla tres" style="margin-top:12px">
         <label class="campo">Almacén
           <select name="almacen_id">
-            <% almacenes.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %></option><% }) %>
+            <% almacenes.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %><%= a.region_nombre ? ' — '+a.region_nombre : '' %></option><% }) %>
           </select>
         </label>
       </div>

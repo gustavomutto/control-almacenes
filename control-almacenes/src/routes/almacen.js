@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
   const fecha = req.query.fecha || hoyISO();
 
-  const [materiales, ventasHoy, gastosHoy, totalesHoy] = await Promise.all([
+  const [materiales, ventasHoy, gastosHoy, totalesHoy, unidadesHoy] = await Promise.all([
     pool.query(
       'SELECT * FROM materiales WHERE almacen_id = $1 AND activo = true ORDER BY nombre',
       [almacenId]
@@ -35,9 +35,19 @@ router.get('/', async (req, res) => {
        FROM ventas WHERE almacen_id = $1 AND fecha = $2`,
       [almacenId, fecha]
     ),
+    pool.query(
+      `SELECT COALESCE(m.nombre, v.descripcion) AS material, m.unidad,
+              SUM(v.cantidad) AS cantidad, SUM(v.total_venta) AS venta, SUM(v.margen) AS margen
+       FROM ventas v LEFT JOIN materiales m ON m.id = v.material_id
+       WHERE v.almacen_id = $1 AND v.fecha = $2
+       GROUP BY COALESCE(m.nombre, v.descripcion), m.unidad
+       ORDER BY cantidad DESC`,
+      [almacenId, fecha]
+    ),
   ]);
 
   const totalGastosHoy = gastosHoy.rows.reduce((acc, g) => acc + Number(g.valor), 0);
+  const totalUnidadesHoy = unidadesHoy.rows.reduce((acc, u) => acc + Number(u.cantidad), 0);
 
   res.render('almacen/panel', {
     almacen: { id: almacenId, nombre: req.session.usuario.almacenNombre },
@@ -46,6 +56,8 @@ router.get('/', async (req, res) => {
     gastos: gastosHoy.rows,
     totales: totalesHoy.rows[0],
     totalGastosHoy,
+    unidadesHoy: unidadesHoy.rows,
+    totalUnidadesHoy,
     fecha,
     hoy: hoyISO(),
     mensaje: req.query.ok || null,

@@ -22,7 +22,24 @@
       <div class="tarjeta"><span>Costo del material vendido</span><strong><%= fmt(totales.total_costo) %></strong></div>
       <div class="tarjeta margen"><span>Me queda (margen)</span><strong><%= fmt(totales.margen) %></strong></div>
       <div class="tarjeta gastos"><span>Gastos del día</span><strong><%= fmt(totalGastosHoy) %></strong></div>
+      <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalUnidadesHoy) %></strong></div>
     </div>
+
+    <h3 style="margin-top:6px">Mercancía vendida hoy, por unidad</h3>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad</th><th class="n">Vendido</th><th class="n">Margen</th></tr></thead>
+      <tbody>
+        <% unidadesHoy.forEach(u => { %>
+          <tr>
+            <td><%= u.material %><%= u.unidad ? ' ('+u.unidad+')' : '' %></td>
+            <td class="n"><%= fmtCant(u.cantidad) %></td>
+            <td class="n"><%= fmt(u.venta) %></td>
+            <td class="n"><%= fmt(u.margen) %></td>
+          </tr>
+        <% }) %>
+        <% if (unidadesHoy.length === 0) { %><tr><td colspan="4" class="vacio">Sin ventas registradas este día.</td></tr><% } %>
+      </tbody>
+    </table>
   </div>
 
   <div class="panel">

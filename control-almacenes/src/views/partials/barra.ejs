@@ -10,6 +10,7 @@
     <% } else { %>
       <a href="/jefa" class="<%= activo === 'panel' ? 'activo' : '' %>">Hoy</a>
       <a href="/jefa/reporte" class="<%= activo === 'reporte' ? 'activo' : '' %>">Reporte mensual</a>
+      <a href="/jefa/gastos" class="<%= activo === 'gastos' ? 'activo' : '' %>">Gastos</a>
       <% if (usuario.rol === 'admin') { %>
         <a href="/jefa/admin" class="<%= activo === 'admin' ? 'activo' : '' %>">Almacenes y usuarios</a>
       <% } %>
