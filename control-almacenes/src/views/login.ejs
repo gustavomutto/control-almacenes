@@ -1,0 +1,19 @@
+<%- include('partials/head', { titulo: 'Ingresar — Control de almacenes' }) %>
+<main>
+  <div class="login-caja">
+    <h1>Control de almacenes</h1>
+    <p>Ingresa con el usuario y clave de tu almacén.</p>
+    <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+    <form method="post" action="/login">
+      <label class="campo" style="margin-bottom:12px">Usuario
+        <input type="text" name="usuario" autocomplete="username" autocapitalize="off" required autofocus>
+      </label>
+      <label class="campo" style="margin-bottom:20px">Clave
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="btn prim" type="submit" style="width:100%">Entrar</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

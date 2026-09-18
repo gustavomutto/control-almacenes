@@ -1,0 +1,40 @@
+<%- include('../partials/head', { titulo: 'Hoy — Control de almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'panel' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Resumen del día</h2>
+        <p class="ayuda" style="margin:0">Todos los almacenes</p>
+      </div>
+      <form method="get" action="/jefa" style="margin-left:auto">
+        <label class="campo">Ver fecha <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Vendido hoy (los 4)</span><strong><%= fmt(totales.venta) %></strong></div>
+      <div class="tarjeta"><span>Costo del material</span><strong><%= fmt(totales.costo) %></strong></div>
+      <div class="tarjeta margen"><span>Ganancia real de hoy</span><strong><%= fmt(totales.margen) %></strong></div>
+      <div class="tarjeta gastos"><span>Gastos de hoy</span><strong><%= fmt(totales.gastos) %></strong></div>
+    </div>
+
+    <table class="tabla">
+      <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+      <tbody>
+        <% filas.forEach(f => { %>
+          <tr>
+            <td><span class="chip almacen"><%= f.almacen.nombre %></span></td>
+            <td class="n"><%= fmt(f.venta) %></td>
+            <td class="n"><%= fmt(f.costo) %></td>
+            <td class="n"><%= fmt(f.margen) %></td>
+            <td class="n"><%= fmt(f.gastos) %></td>
+          </tr>
+        <% }) %>
+        <% if (filas.length === 0) { %><tr><td colspan="5" class="vacio">Todavía no hay almacenes creados.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>

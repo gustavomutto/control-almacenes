@@ -1,0 +1,2 @@
+release: node src/db/migrate.js
+web: node src/server.js
