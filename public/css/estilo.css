@@ -81,3 +81,62 @@ table.tabla tfoot td{font-weight:700;border-top:2px solid var(--line);border-bot
   main{padding:14px}
   table.tabla{display:block;overflow-x:auto}
 }
+
+/* ===================== Punto de venta ===================== */
+.vista-pos{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+.trabajo{background:var(--panel);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;min-height:calc(100vh - 120px)}
+
+.buscador{position:relative;padding:18px 20px 6px}
+.buscador input{width:100%;font-size:17px;padding:12px 14px;border:2px solid var(--line);border-radius:6px}
+.buscador input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft)}
+.pista{margin:6px 2px 0;font-size:13px;color:var(--steel)}
+.sugerencias{position:absolute;left:20px;right:20px;top:64px;z-index:10;margin:0;padding:0;list-style:none;
+  background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 20px rgba(22,32,42,.14);max-height:280px;overflow:auto}
+.sugerencias li{display:flex;justify-content:space-between;gap:14px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--line)}
+.sugerencias li:last-child{border-bottom:0}
+.sugerencias li:hover,.sugerencias li.marcada{background:var(--blue-soft)}
+.sug-precio{color:var(--steel);font-size:13px;white-space:nowrap}
+
+.tabla-wrap{padding:8px 20px;flex:1}
+.items-venta td{padding:5px 10px}
+.items-venta .in{padding:7px 9px;border:1px solid var(--line);border-radius:4px;width:100%;max-width:120px}
+.items-venta .in.n{text-align:right}
+.items-venta tr.sin-stock td{background:#FDF1F0}
+.items-venta small{color:var(--steel);font-weight:400}
+.quitar{background:none;border:1px solid transparent;color:var(--steel);font-size:20px;line-height:1;padding:2px 9px;border-radius:4px;cursor:pointer}
+.quitar:hover{color:var(--red);border-color:#F1C6C1;background:#FDF1F0}
+
+.campos-venta{display:grid;grid-template-columns:2fr 1fr auto;gap:14px;align-items:end;padding:10px 20px}
+.check{display:flex;align-items:center;gap:8px;font-weight:500;padding:9px 0;white-space:nowrap;cursor:pointer;font-size:14px}
+.m2{display:grid;grid-template-columns:200px 1fr auto auto;gap:14px;align-items:end;padding:18px 20px 4px}
+
+.pagos{padding:4px 20px 14px}
+.pagos-cab{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.pagos-cab .titulo{font-size:13px;font-weight:700;color:var(--steel);text-transform:uppercase;letter-spacing:.02em}
+.pagos-estado{margin-left:auto;font-weight:700;font-size:15px}
+.pagos-estado[data-t="falta"]{color:var(--red)}
+.pagos-estado[data-t="cambio"]{color:var(--blue);font-size:17px}
+.pagos-estado[data-t="ok"]{color:var(--green)}
+.pago{display:grid;grid-template-columns:minmax(0,240px) 160px 40px;gap:10px;align-items:center;margin-bottom:8px}
+.pago select,.pago input{padding:9px 11px;border:1px solid var(--line);border-radius:5px;background:#fff;width:100%}
+
+.cobro{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+  padding:16px 20px;background:var(--ink);color:#fff;border-radius:0 0 5px 5px}
+.cobro .total{display:flex;flex-direction:column;line-height:1}
+.cobro .total span{font-size:13px;color:#93A1AE;margin-bottom:4px}
+.cobro .total strong{font-family:var(--fc);font-size:42px}
+.cobro .acciones{display:flex;gap:10px;flex-wrap:wrap}
+.btn.sec{background:transparent;border-color:#475562;color:#fff}
+.btn.sec:hover:not(:disabled){background:#243140}
+.btn.cobrar{background:var(--amber);color:var(--ink);font-size:16px;padding:12px 20px}
+.btn.cobrar:hover{background:#F6C04F}
+
+tr.anulada td{opacity:.55;text-decoration:line-through}
+.sin-stock td:first-child{color:var(--red)}
+
+@media (max-width:1100px){
+  .vista-pos{grid-template-columns:minmax(0,1fr)}
+  .papel-wrap{position:static;max-width:420px;margin:0 auto;width:100%}
+  .trabajo{min-height:0}
+  .campos-venta,.m2{grid-template-columns:1fr}
+}

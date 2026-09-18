@@ -1,0 +1,77 @@
+<%- include('../partials/head', { titulo: 'Caja — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'caja' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Caja del día</h2>
+        <p class="ayuda" style="margin:0"><%= almacen.nombre %></p>
+      </div>
+      <form method="get" action="/almacen/caja" style="margin-left:auto">
+        <label class="campo">Día <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Venta total</span><strong><%= fmt(resumen.total) %></strong></div>
+      <div class="tarjeta"><span>Facturas</span><strong><%= resumen.cantidad %></strong></div>
+      <div class="tarjeta gastos"><span>Gastos del día</span><strong><%= fmt(resumen.totalGastos) %></strong></div>
+      <div class="tarjeta margen"><span>Efectivo a entregar</span><strong><%= fmt(resumen.entregar) %></strong></div>
+    </div>
+
+    <h3>Cuadre por forma de pago</h3>
+    <table class="tabla">
+      <thead><tr><th>Forma de pago</th><th class="n">Valor</th></tr></thead>
+      <tbody>
+        <% resumen.metodos.forEach(m => { %>
+          <tr><td><%= m.metodo %></td><td class="n"><%= fmt(m.valor) %></td></tr>
+        <% }) %>
+        <% if (resumen.metodos.length === 0) { %><tr><td colspan="2" class="vacio">Sin ventas este día.</td></tr><% } %>
+      </tbody>
+      <% if (resumen.metodos.length > 0) { %>
+        <tfoot><tr><td>Total</td><td class="n"><%= fmt(resumen.total) %></td></tr></tfoot>
+      <% } %>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Gastos del día</h3>
+    <form method="post" action="/almacen/gastos">
+      <input type="hidden" name="fecha" value="<%= fecha %>">
+      <div class="rejilla tres">
+        <label class="campo ancho" style="grid-column:1/2">Descripción <input type="text" name="concepto" placeholder="Ej: almuerzo, transporte, bolsas" required></label>
+        <label class="campo">Categoría (opcional) <input type="text" name="categoria"></label>
+        <label class="campo">Valor <input type="number" name="valor" min="1" step="1" required></label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Agregar gasto</button></div>
+    </form>
+
+    <table class="tabla" style="margin-top:20px">
+      <thead><tr><th>Descripción</th><th>Categoría</th><th class="n">Valor</th><th></th></tr></thead>
+      <tbody>
+        <% resumen.gastos.forEach(g => { %>
+          <tr>
+            <td><%= g.concepto %></td>
+            <td><%= g.categoria || '—' %></td>
+            <td class="n"><%= fmt(g.valor) %></td>
+            <td class="n">
+              <form method="post" action="/almacen/gastos/<%= g.id %>/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar este gasto?')">
+                <input type="hidden" name="fecha" value="<%= fecha %>">
+                <button class="btn peligro mini" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (resumen.gastos.length === 0) { %><tr><td colspan="4" class="vacio">No hay gastos registrados este día.</td></tr><% } %>
+      </tbody>
+    </table>
+
+    <div style="margin-top:18px">
+      <a class="btn cobrar" href="/almacen/caja/imprimir?fecha=<%= fecha %>&auto=0">Imprimir cierre de caja</a>
+    </div>
+  </div>
+</main>
+</body>
+</html>

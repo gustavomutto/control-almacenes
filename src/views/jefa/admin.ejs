@@ -2,6 +2,7 @@
 <%- include('../partials/barra', { usuario, activo: 'admin' }) %>
 <main>
   <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
   <% if (tempPassword) { %>
     <div class="aviso-caja">
       <b>Guarda esta clave ahora, no se volverá a mostrar:</b><br>
@@ -10,19 +11,28 @@
   <% } %>
 
   <div class="panel">
-    <h3>Regiones</h3>
-    <p class="ayuda">Agrupan varios almacenes (ej: Valledupar). Crea una región y luego asígnala a cada almacén.</p>
+    <h3>Sedes / regiones</h3>
+    <p class="ayuda">Agrupan varios almacenes (por ejemplo Valledupar). Una región solo se puede borrar si no tiene almacenes.</p>
     <table class="tabla">
-      <thead><tr><th>Nombre</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Nombre</th><th class="n">Almacenes</th><th></th></tr></thead>
       <tbody>
         <% regiones.forEach(r => { %>
-          <tr><td><%= r.nombre %></td><td><%= r.activo ? 'Activa' : 'Inactiva' %></td></tr>
+          <tr>
+            <td><%= r.nombre %></td>
+            <td class="n"><%= almacenes.filter(a => a.region_id === r.id).length %></td>
+            <td class="n">
+              <form method="post" action="/jefa/admin/regiones/<%= r.id %>/eliminar" style="display:inline"
+                    onsubmit="return confirm('¿Eliminar la región <%= r.nombre %>?')">
+                <button class="btn peligro mini" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
         <% }) %>
-        <% if (regiones.length === 0) { %><tr><td colspan="2" class="vacio">Todavía no hay regiones.</td></tr><% } %>
+        <% if (regiones.length === 0) { %><tr><td colspan="3" class="vacio">Todavía no hay regiones.</td></tr><% } %>
       </tbody>
     </table>
     <form method="post" action="/jefa/admin/regiones" style="margin-top:16px;display:flex;gap:10px;align-items:end">
-      <label class="campo" style="flex:1">Nueva región <input type="text" name="nombre" placeholder="Ej: Valledupar" required></label>
+      <label class="campo" style="flex:1">Nueva sede o región <input type="text" name="nombre" placeholder="Ej: Santa Marta" required></label>
       <button class="btn prim" type="submit">Crear región</button>
     </form>
   </div>
@@ -30,22 +40,60 @@
   <div class="panel">
     <h3>Almacenes</h3>
     <table class="tabla">
-      <thead><tr><th>Nombre</th><th>Región</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Sede</th><th>Impresión</th><th class="n">Facturas</th><th></th></tr></thead>
       <tbody>
         <% almacenes.forEach(a => { %>
-          <tr><td><%= a.nombre %></td><td><%= a.region_nombre || '—' %></td><td><%= a.activo ? 'Activo' : 'Inactivo' %></td></tr>
+          <tr>
+            <td><b><%= a.nombre %></b></td>
+            <td colspan="2">
+              <form method="post" action="/jefa/admin/almacenes/<%= a.id %>/actualizar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <select name="region_id" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                  <option value="">Sin sede</option>
+                  <% regiones.forEach(r => { %>
+                    <option value="<%= r.id %>" <%= a.region_id === r.id ? 'selected' : '' %>><%= r.nombre %></option>
+                  <% }) %>
+                </select>
+                <select name="papel" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                  <option value="carta" <%= a.papel === 'carta' ? 'selected' : '' %>>Hoja carta</option>
+                  <option value="80mm" <%= a.papel === '80mm' ? 'selected' : '' %>>Ticket POS 80mm</option>
+                  <option value="58mm" <%= a.papel === '58mm' ? 'selected' : '' %>>Ticket POS 58mm</option>
+                </select>
+                <button class="btn linea mini" type="submit">Guardar</button>
+              </form>
+            </td>
+            <td class="n"><%= a.documentos %></td>
+            <td class="n">
+              <form method="post" action="/jefa/admin/almacenes/<%= a.id %>/eliminar" style="display:flex;gap:6px;justify-content:flex-end"
+                    onsubmit="return confirm('Esto borra el almacén «<%= a.nombre %>» con TODAS sus facturas, productos y gastos. ¿Continuar?')">
+                <input type="text" name="confirmacion" placeholder="Escribe el nombre" style="width:150px;padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                <button class="btn peligro mini" type="submit">Borrar</button>
+              </form>
+            </td>
+          </tr>
         <% }) %>
       </tbody>
     </table>
-    <form method="post" action="/jefa/admin/almacenes" style="margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
-      <label class="campo" style="flex:1">Nuevo almacén <input type="text" name="nombre" placeholder="Ej: Almacén 5" required></label>
-      <label class="campo">Región
-        <select name="region_id">
-          <option value="">Sin región</option>
-          <% regiones.forEach(r => { %><option value="<%= r.id %>"><%= r.nombre %></option><% }) %>
-        </select>
-      </label>
-      <button class="btn prim" type="submit">Crear almacén</button>
+    <p class="ayuda" style="margin-top:10px">Para borrar un almacén debes escribir su nombre exacto en la casilla. Se borra con todo lo que tenga dentro.</p>
+
+    <h3 style="margin-top:24px">Crear almacén</h3>
+    <form method="post" action="/jefa/admin/almacenes">
+      <div class="rejilla tres">
+        <label class="campo">Nombre <input type="text" name="nombre" placeholder="Ej: PVC Santa Marta" required></label>
+        <label class="campo">Sede / región
+          <select name="region_id">
+            <option value="">Sin sede</option>
+            <% regiones.forEach(r => { %><option value="<%= r.id %>"><%= r.nombre %></option><% }) %>
+          </select>
+        </label>
+        <label class="campo">Impresión
+          <select name="papel">
+            <option value="carta">Hoja carta</option>
+            <option value="80mm">Ticket POS 80mm</option>
+            <option value="58mm">Ticket POS 58mm</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Crear almacén</button></div>
     </form>
   </div>
 
@@ -62,11 +110,13 @@
             <td><%= u.almacen_nombre || '—' %></td>
             <td><%= u.activo ? 'Activo' : 'Inactivo' %></td>
             <td class="n">
-              <% if (u.activo) { %>
-                <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/desactivar" style="display:inline" onsubmit="return confirm('¿Desactivar este usuario?')">
-                  <button class="btn peligro mini" type="submit">Desactivar</button>
-                </form>
-              <% } %>
+              <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/clave" style="display:inline"
+                    onsubmit="return confirm('¿Generar una clave nueva para <%= u.usuario %>?')">
+                <button class="btn linea mini" type="submit">Nueva clave</button>
+              </form>
+              <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/desactivar" style="display:inline">
+                <button class="btn peligro mini" type="submit"><%= u.activo ? 'Desactivar' : 'Activar' %></button>
+              </form>
             </td>
           </tr>
         <% }) %>
@@ -81,7 +131,7 @@
         <label class="campo">Rol
           <select name="rol" id="rolSel" onchange="toggleAlmacen()">
             <option value="almacen">Personal de almacén</option>
-            <option value="jefa">Jefa (vista consolidada, solo lectura)</option>
+            <option value="jefa">Jefa (ve todo, no factura)</option>
             <option value="admin">Administrador</option>
           </select>
         </label>
@@ -89,7 +139,9 @@
       <div id="campoAlmacen" class="rejilla tres" style="margin-top:12px">
         <label class="campo">Almacén
           <select name="almacen_id">
-            <% almacenes.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %><%= a.region_nombre ? ' — '+a.region_nombre : '' %></option><% }) %>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>"><%= a.nombre %><%= a.region_nombre ? ' — ' + a.region_nombre : '' %></option>
+            <% }) %>
           </select>
         </label>
       </div>

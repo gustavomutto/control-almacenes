@@ -1,0 +1,40 @@
+<%- include('../partials/head', { titulo: 'Datos — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'datos' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+
+  <div class="panel">
+    <h2>Datos del almacén</h2>
+    <p class="ayuda">Esta información sale impresa en las facturas y cotizaciones de <b><%= almacen.nombre %></b>.</p>
+
+    <form method="post" action="/almacen/datos">
+      <div class="rejilla">
+        <label class="campo ancho">Primera línea del encabezado
+          <input type="text" name="encabezado" value="<%= almacen.encabezado %>" placeholder="<%= almacen.nombre %>">
+        </label>
+        <label class="campo ancho">Dirección <input type="text" name="direccion" value="<%= almacen.direccion %>"></label>
+        <label class="campo">NIT <input type="text" name="nit" value="<%= almacen.nit %>"></label>
+        <label class="campo">Teléfono <input type="text" name="telefono" value="<%= almacen.telefono %>"></label>
+        <label class="campo ancho">Nota al final de la factura
+          <input type="text" name="nota" value="<%= almacen.nota %>" placeholder="Ej: No se aceptan devoluciones después de 8 días">
+        </label>
+        <label class="campo ancho">Formas de pago (separadas por coma)
+          <input type="text" name="metodos_pago" value="<%= almacen.metodos_pago %>" placeholder="Efectivo,Transferencia,Datáfono">
+        </label>
+        <label class="check ancho">
+          <input type="checkbox" name="iva_por_defecto" <%= almacen.iva_por_defecto ? 'checked' : '' %>>
+          Marcar «Cobrar IVA 19%» en cada venta nueva
+        </label>
+      </div>
+      <div style="margin-top:16px"><button class="btn prim" type="submit">Guardar datos</button></div>
+    </form>
+
+    <h3 style="margin-top:26px">Impresión</h3>
+    <p class="ayuda">
+      Este almacén imprime en <b><%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket POS ' + almacen.papel %></b>.
+      Si necesitas cambiarlo, pídelo a la administración.
+    </p>
+  </div>
+</main>
+</body>
+</html>

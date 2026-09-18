@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= doc.tipo === 'factura' ? 'Factura' : 'Cotización' %> N° <%= doc.numero %></title>
+<link rel="stylesheet" href="/css/estilo.css">
+<link rel="stylesheet" href="/css/ticket.css">
+<style>
+<%- papelCss %>
+</style>
+</head>
+<body class="modo-impresion">
+  <div class="barra-imprimir no-print">
+    <a class="btn linea" href="<%= volver %>">← Volver</a>
+    <span>
+      <%= doc.tipo === 'factura' ? 'Factura' : 'Cotización' %> N° <%= doc.numero %> ·
+      <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %>
+    </span>
+    <button class="btn prim" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <div id="print-area">
+    <%- include('partials/ticket', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
+  </div>
+
+<% if (auto) { %>
+<script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+<% } %>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cierre de caja — <%= fechaTexto %></title>
+<link rel="stylesheet" href="/css/estilo.css">
+<link rel="stylesheet" href="/css/ticket.css">
+<style><%- papelCss %></style>
+</head>
+<body class="modo-impresion">
+  <div class="barra-imprimir no-print">
+    <a class="btn linea" href="/almacen/caja?fecha=<%= fecha %>">← Volver</a>
+    <span>Cierre de caja · <%= fechaTexto %></span>
+    <button class="btn prim" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <div id="print-area">
+    <div class="tk">
+      <div class="c"><%= almacen.encabezado || almacen.nombre %></div>
+      <div class="c"><%= almacen.direccion %></div>
+      <div class="c tk-tipo">CIERRE DE CAJA</div>
+      <div class="c">NIT: <%= almacen.nit %></div>
+      <div class="c">Tel: <%= almacen.telefono %></div>
+      <div class="tk-f3"><span>Día:</span><span></span><span class="r"><%= fechaTexto %></span></div>
+      <div class="tk-f3"><span>Impreso:</span><span></span><span class="r"><%= hora %></span></div>
+      <div class="tk-cli">
+        <span>FACTURAS: <%= resumen.cantidad %></span>
+        <span class="r"><%= resumen.facturas.length ? resumen.facturas[0].numero + ' a ' + resumen.facturas[resumen.facturas.length-1].numero : '' %></span>
+      </div>
+
+      <div class="tk-cuadre">
+        <span class="tk-grande">VENTA TOTAL</span><span class="r tk-grande"><%= fmt(resumen.total) %></span>
+        <% resumen.metodos.forEach(m => { %>
+          <span class="ind"><%= m.metodo %></span><span class="r"><%= fmt(m.valor) %></span>
+        <% }) %>
+        <i class="tk-sep"></i>
+        <span>GASTOS</span><span></span>
+        <% if (resumen.gastos.length === 0) { %>
+          <span class="ind suave">Sin gastos</span><span></span>
+        <% } else { resumen.gastos.forEach(g => { %>
+          <span class="ind suave"><%= g.concepto %></span><span class="r suave"><%= fmt(g.valor) %></span>
+        <% }) } %>
+        <span>TOTAL GASTOS</span><span class="r"><%= fmt(resumen.totalGastos) %></span>
+        <i class="tk-sep"></i>
+        <span class="ind suave">Efectivo</span><span class="r suave"><%= fmt(resumen.efectivo) %></span>
+        <span class="ind suave">Menos gastos</span><span class="r suave"><%= resumen.totalGastos ? '- ' + fmt(resumen.totalGastos) : fmt(0) %></span>
+        <span class="tk-grande">EFECTIVO A ENTREGAR</span><span class="r tk-grande"><%= fmt(resumen.entregar) %></span>
+      </div>
+
+      <div class="tk-firmas"><div>Entregado por</div><div>Recibido por</div></div>
+    </div>
+  </div>
+
+<% if (auto) { %>
+<script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+<% } %>
+</body>
+</html>

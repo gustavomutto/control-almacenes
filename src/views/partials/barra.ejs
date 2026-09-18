@@ -1,16 +1,21 @@
 <header class="barra">
   <div class="marca">
-    <strong>Control de almacenes</strong>
-    <small><%= usuario.rol === 'almacen' ? usuario.almacenNombre : (usuario.rol === 'admin' ? 'Administrador' : 'Vista general') %></small>
+    <strong><%= usuario.rol === 'almacen' ? usuario.almacenNombre : 'Control de almacenes' %></strong>
+    <small><%= usuario.rol === 'almacen' ? 'Facturación' : (usuario.rol === 'admin' ? 'Administrador' : 'Vista general') %></small>
   </div>
   <nav>
     <% if (usuario.rol === 'almacen') { %>
-      <a href="/almacen" class="<%= activo === 'panel' ? 'activo' : '' %>">Hoy</a>
-      <a href="/almacen/reporte" class="<%= activo === 'reporte' ? 'activo' : '' %>">Reporte mensual</a>
+      <a href="/almacen" class="<%= activo === 'facturar' ? 'activo' : '' %>">Facturar</a>
+      <a href="/almacen/cotizar" class="<%= activo === 'cotizar' ? 'activo' : '' %>">Cotizar</a>
+      <a href="/almacen/documentos" class="<%= activo === 'documentos' ? 'activo' : '' %>">Facturas</a>
+      <a href="/almacen/productos" class="<%= activo === 'productos' ? 'activo' : '' %>">Productos</a>
+      <a href="/almacen/caja" class="<%= activo === 'caja' ? 'activo' : '' %>">Caja</a>
+      <a href="/almacen/datos" class="<%= activo === 'datos' ? 'activo' : '' %>">Mis datos</a>
     <% } else { %>
       <a href="/jefa" class="<%= activo === 'panel' ? 'activo' : '' %>">Hoy</a>
       <a href="/jefa/reporte" class="<%= activo === 'reporte' ? 'activo' : '' %>">Reporte mensual</a>
       <a href="/jefa/gastos" class="<%= activo === 'gastos' ? 'activo' : '' %>">Gastos</a>
+      <a href="/jefa/costos" class="<%= activo === 'costos' ? 'activo' : '' %>">Costos</a>
       <% if (usuario.rol === 'admin') { %>
         <a href="/jefa/admin" class="<%= activo === 'admin' ? 'activo' : '' %>">Almacenes y usuarios</a>
       <% } %>

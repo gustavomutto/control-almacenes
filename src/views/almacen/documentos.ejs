@@ -1,0 +1,57 @@
+<%- include('../partials/head', { titulo: 'Facturas — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'documentos' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px"><%= tipo === 'factura' ? 'Facturas' : 'Cotizaciones' %> del día</h2>
+        <p class="ayuda" style="margin:0"><%= almacen.nombre %></p>
+      </div>
+      <form method="get" action="/almacen/documentos" style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+        <label class="campo">Tipo
+          <select name="tipo" onchange="this.form.submit()">
+            <option value="factura" <%= tipo === 'factura' ? 'selected' : '' %>>Facturas</option>
+            <option value="cotizacion" <%= tipo === 'cotizacion' ? 'selected' : '' %>>Cotizaciones</option>
+          </select>
+        </label>
+        <label class="campo">Fecha <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Total del día</span><strong><%= fmt(total) %></strong></div>
+      <div class="tarjeta"><span>Documentos</span><strong><%= documentos.filter(d => !d.anulada).length %></strong></div>
+    </div>
+
+    <table class="tabla">
+      <thead>
+        <tr><th>N°</th><th>Cliente</th><th>Vendedor</th><th>Pagos</th><th class="n">Total</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% documentos.forEach(d => { %>
+          <tr<%= d.anulada ? ' class="anulada"' : '' %>>
+            <td><%= d.numero %><%= d.anulada ? ' (anulada)' : '' %></td>
+            <td><%= d.cliente || 'Consumidor final' %></td>
+            <td><%= d.vendedor || '—' %></td>
+            <td><%= d.pagos || '—' %></td>
+            <td class="n"><%= fmt(d.total) %></td>
+            <td class="n">
+              <a class="btn linea mini" href="/almacen/imprimir/<%= d.id %>?auto=0">Ver / imprimir</a>
+              <% if (tipo === 'factura' && !d.anulada) { %>
+                <form method="post" action="/almacen/documentos/<%= d.id %>/anular" style="display:inline"
+                      onsubmit="return confirm('¿Anular esta factura? El inventario se devuelve.')">
+                  <button class="btn peligro mini" type="submit">Anular</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (documentos.length === 0) { %>
+          <tr><td colspan="6" class="vacio">No hay <%= tipo === 'factura' ? 'facturas' : 'cotizaciones' %> este día.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>

@@ -1,114 +1,109 @@
-# Control de almacenes — materiales, ventas, gastos y rentabilidad
+# Control de almacenes — facturación, inventario y rentabilidad
 
-Sistema web (no una hoja de cálculo) para que cada almacén suba sus precios de material,
-registre ventas y gastos del día, y tu jefa vea todo consolidado desde su iPad, en tiempo real,
-sin que nadie tenga que descargar ni reenviar archivos.
+Sistema web para varios almacenes. Cada almacén tiene su propio sitio de facturación
+(vender, cotizar, inventario, caja) y la administración ve el consolidado con la ganancia real.
 
-## Cómo funciona
+## Quién ve qué
 
-- **Cada almacén** tiene su propio usuario y clave. Solo ve y sube su propia información.
-  - Sube el catálogo de materiales: precio de costo (lo que le cuesta) y precio de venta.
-  - Registra cada venta del día (elige el material y la cantidad; el sistema calcula el margen solo).
-  - Registra los gastos del día (arriendo, nómina, transporte, etc.).
-- **Tu jefa** tiene un usuario de solo lectura que consolida todos los almacenes, agrupados por
-  región: ve el resumen de hoy y un reporte mensual con la **ganancia real total del mes** (la suma
-  de las ventas menos el costo del material, sin descontar los gastos) y, aparte, **el total de
-  gastos del mes** — tal como lo pediste.
-- **Administrador** (para ti): puede crear regiones, almacenes nuevos y usuarios, además de ver
-  todo lo de la jefa.
+| | Personal del almacén | Jefa | Administrador |
+|---|---|---|---|
+| Facturar y cotizar | Sí (solo su almacén) | No | No |
+| Inventario y precios de venta | Sí (su almacén) | Consulta | Consulta |
+| **Precio de costo y ganancia** | **No lo ve nunca** | Sí | Sí |
+| Reportes de todos los almacenes | No | Sí | Sí |
+| Crear/borrar almacenes, sedes y usuarios | No | Sí | Sí |
 
-El margen de cada venta se calcula así: `(precio de venta − precio de costo) × cantidad`.
-Ese es el número que ves día a día como "lo que te queda". Los gastos se muestran siempre
-en una columna aparte, nunca se restan automáticamente de la ganancia.
+La idea de fondo: **el vendedor factura al precio que quiera**; el costo lo pone la
+administración y la ganancia se calcula solo para ellos.
 
-## Regiones
+## El sitio de cada almacén
 
-Un almacén puede pertenecer a una región (ej: Valledupar). En "Mis datos" → "Almacenes y
-usuarios" (usuario administrador) puedes crear una región nueva y, al crear un almacén, elegir
-a qué región pertenece. Tanto el resumen del día como el reporte mensual de la jefa agrupan los
-almacenes por región.
+- **Facturar**: busca productos (escribe `3*lamina` para 3 unidades), precio editable línea
+  por línea, descuento, IVA 19% opcional, varias formas de pago con cálculo de cambio, y
+  vista previa de cómo saldrá impresa. Al cobrar, descuenta el inventario.
+- **Cotizar**: calculadora de metros cuadrados para techos PVC (lámina, cornisa, omega,
+  vigueta, ángulo y tornillos, con las mismas fórmulas del programa original) más productos
+  sueltos. Las cotizaciones no mueven inventario.
+- **Facturas**: historial por día, reimprimir y anular (al anular, el inventario se devuelve).
+- **Productos**: catálogo con precio de venta, unidad y existencias; registrar entradas de
+  mercancía.
+- **Caja**: cuadre del día por forma de pago, gastos del día y «efectivo a entregar»
+  (efectivo cobrado menos gastos), con cierre imprimible.
+- **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
+  impresos.
 
-Los 4 almacenes originales ya están renombrados y agrupados en la región **Valledupar**:
+## Impresión
 
-| Nombre anterior | Nombre actual |
-|---|---|
-| Almacén 1 | PVC La 11 |
-| Almacén 2 | Techos PVC |
-| Almacén 3 | Universal Viviana |
-| Almacén 4 | PVElectricos |
+Cada almacén se configura en hoja carta o en ticket POS térmico (80mm o 58mm) desde
+«Almacenes y usuarios». Hoy:
 
-Los usuarios de inicio de sesión de cada almacén (`almacen1`, `almacen2`, etc.) no cambiaron,
-solo el nombre visible.
+| Almacén | Sede | Impresión |
+|---|---|---|
+| PVC La 11 | Valledupar | Ticket POS 80mm |
+| Techos PVC | Valledupar | Hoja carta |
+| Universal Viviana | Valledupar | Hoja carta |
+| PVElectricos | Valledupar | Hoja carta |
 
-## Informes
+## Sedes / regiones
 
-- **Informe de gastos** (pestaña "Gastos", jefa/administrador): el detalle de cada gasto
-  registrado, filtrable por mes, región o almacén, con subtotales por región, por almacén y el
-  total general.
-- **Mercancía vendida por unidad**: tanto el panel del almacén (del día) como el panel y el
-  reporte mensual de la jefa muestran cuántas unidades de cada material se vendieron, no solo
-  el valor en dinero.
+Un almacén pertenece a una sede (por ejemplo Valledupar). Desde «Almacenes y usuarios» se
+crean sedes nuevas, se crean almacenes asignándoles sede e impresión, y se borran almacenes
+(escribiendo su nombre exacto como confirmación, porque se borra con todas sus facturas,
+productos y gastos). Los reportes de la jefa agrupan por sede.
+
+## Cómo se calcula la ganancia
+
+En «Costos» la administración define el precio de costo de cada producto. Al guardar una
+factura, el sistema toma ese costo y lo guarda como una foto dentro de la factura, así que
+cambiar el costo después no altera las facturas viejas.
+
+    ganancia = (lo cobrado sin IVA y ya con el descuento) − (costo de la mercancía vendida)
+
+Los gastos se muestran **aparte**, nunca se restan solos de esa ganancia.
 
 ## Estructura del proyecto
 
 ```
 src/
-  server.js                      servidor principal (Express)
-  db/schema.sql                   estructura de la base de datos (Postgres)
-  db/migrate.js                    crea las tablas
-  db/actualizar_valledupar.js       renombra los 4 almacenes iniciales y crea la región Valledupar (seguro de correr varias veces)
-  db/seed.js                        crea los almacenes y usuarios iniciales
+  server.js                       servidor (Express)
+  lib/calculos.js                  totales, IVA y fórmulas de m²
+  lib/impresion.js                 reglas de papel (carta / 80mm / 58mm)
+  db/schema.sql                    estructura de la base de datos (Postgres)
+  db/migrate.js                     crea/actualiza las tablas
+  db/actualizar_valledupar.js       puesta a punto de los 4 almacenes (segura de repetir)
+  db/seed.js                        usuarios iniciales
   routes/auth.js                    login / logout
-  routes/almacen.js                 panel del almacén (materiales, ventas, gastos, unidades vendidas)
-  routes/jefa.js                     panel consolidado por región, reporte mensual, informe de gastos, administración
-  views/                             páginas (EJS)
-public/css/estilo.css                estilos
+  routes/almacen.js                 facturar, cotizar, productos, caja, impresión
+  routes/jefa.js                    consolidado, reportes, costos, administración
+  views/                            páginas (EJS)
+public/css/estilo.css               estilos
+public/css/ticket.css               formato del ticket/factura impresa
+public/js/pos.js                    pantalla de venta
+public/js/cotizar.js                pantalla de cotización
 ```
 
-## Desplegar en Railway (recomendado — así tu jefa lo ve desde el iPad)
+## Desplegar en Railway
 
-1. Crea un proyecto nuevo en Railway y sube este código (puedes arrastrar la carpeta,
-   conectar un repositorio de GitHub, o usar el CLI de Railway: `railway up`).
-2. Agrega un plugin de **PostgreSQL** al proyecto (botón "New" → "Database" → "PostgreSQL").
-   Railway conecta automáticamente la variable `DATABASE_URL` al servicio web.
-3. En las variables del servicio web, agrega:
-   - `SESSION_SECRET`: un texto largo y aleatorio (por ejemplo, generado en
-     https://1password.com/password-generator o similar).
-   - `NODE_ENV=production`
-   - Opcional: `SEED_ALMACENES` con los nombres de tus almacenes separados por coma
-     (ej: `PVC La 11,Techos PVC,Universal Viviana,PVElectricos`). Solo se usa la primera vez
-     que no exista ningún almacén con ese nombre.
-4. El `Procfile` ya incluye, antes de cada despliegue: crear las tablas, renombrar/agrupar los
-   4 almacenes iniciales en la región Valledupar (no hace nada si ya se aplicó antes), y crear
-   los usuarios iniciales si hacen falta. Luego arranca el servidor.
-5. Después del primer despliegue, corre una sola vez (desde la pestaña "Shell" del servicio
-   en Railway, o con `railway run npm run seed`):
-   ```
-   npm run seed
-   ```
-   Esto crea los usuarios de cada almacén, el de la jefa y el de administrador, y te muestra
-   las claves generadas **una sola vez** en la terminal — guárdalas de inmediato.
-6. Railway te da una URL pública (algo como `tu-proyecto.up.railway.app`). Esa es la dirección
-   que tu jefa abre desde el navegador de su iPad (Safari o Chrome), la guarda como acceso
-   directo en su pantalla de inicio, y queda como una app.
+1. Subir el código al repositorio de GitHub conectado al servicio.
+2. El servicio necesita un Postgres (variable `DATABASE_URL`) y estas variables:
+   `SESSION_SECRET`, `NODE_ENV=production` y, opcional, `SEED_ALMACENES`.
+3. Antes de cada despliegue se ejecuta:
+   `node src/db/migrate.js && node src/db/actualizar_valledupar.js && node src/db/seed.js`
+   (crear tablas → poner a punto almacenes/sede → crear usuarios que falten).
+   Todo es seguro de repetir: si ya se aplicó, no hace nada.
 
 ## Desarrollo local
 
-Requiere Node 18+ y una base de datos Postgres.
-
 ```
 npm install
-cp .env.example .env      # edita DATABASE_URL con tu Postgres local
+cp .env.example .env      # apunta DATABASE_URL a tu Postgres local
 npm run migrate
 npm run seed
-npm start
+npm start                 # http://localhost:3000
 ```
 
-Luego abre `http://localhost:3000`.
+## Ideas para más adelante
 
-## Ideas para más adelante (no incluidas todavía)
-
-- Convertirlo en un producto multi-negocio con registro propio y cobro de mensualidad
-  (necesitaría aislar los datos por negocio y agregar Stripe u otra pasarela de pago).
-- Exportar el reporte mensual a Excel/PDF.
-- Gráficas de ventas y rentabilidad por almacén.
+- Carga masiva de productos desde Excel/CSV.
+- Convertirlo en producto multi-negocio con cobro de mensualidad.
+- Gráficas de ventas y rentabilidad.

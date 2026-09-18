@@ -1,0 +1,70 @@
+<%- include('../partials/head', { titulo: 'Productos — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'productos' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <div class="panel">
+    <h2>Productos e inventario</h2>
+    <p class="ayuda">Aquí defines qué vendes y a qué precio. Si el producto ya existe con el mismo nombre, se actualiza.</p>
+    <form method="post" action="/almacen/productos">
+      <div class="rejilla tres">
+        <label class="campo ancho" style="grid-column:1/2">Nombre del producto <input type="text" name="nombre" id="pNombre" required></label>
+        <label class="campo">Unidad <input type="text" name="unidad" id="pUnidad" value="unidad" placeholder="unidad, metro, kg"></label>
+        <label class="campo">Precio de venta <input type="number" name="precio_venta" id="pPrecio" min="0" step="1" required></label>
+        <label class="campo">Existencias iniciales <input type="number" name="existencias" id="pExist" min="0" step="0.01" value="0"></label>
+        <label class="check" style="align-self:end"><input type="checkbox" name="controla_stock" checked> Descontar del inventario al vender</label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Guardar producto</button></div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Catálogo (<%= productos.filter(p => p.activo).length %> productos)</h3>
+    <table class="tabla">
+      <thead>
+        <tr><th>Producto</th><th>Unidad</th><th class="n">Precio venta</th><th class="n">Existencias</th><th class="n">Entrada</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% productos.filter(p => p.activo).forEach(p => { %>
+          <tr<%= Number(p.existencias) <= 0 && p.controla_stock ? ' class="sin-stock"' : '' %>>
+            <td><%= p.nombre %></td>
+            <td><%= p.unidad %></td>
+            <td class="n"><%= fmt(p.precio_venta) %></td>
+            <td class="n"><%= p.controla_stock ? fmtCant(p.existencias) : '—' %></td>
+            <td class="n">
+              <% if (p.controla_stock) { %>
+                <form method="post" action="/almacen/productos/<%= p.id %>/entrada" style="display:flex;gap:6px;justify-content:flex-end">
+                  <input class="in n" style="width:90px" type="number" name="cantidad" step="0.01" placeholder="+ cant.">
+                  <button class="btn linea mini" type="submit">Entró</button>
+                </form>
+              <% } else { %>—<% } %>
+            </td>
+            <td class="n">
+              <button type="button" class="btn linea mini"
+                onclick="editar('<%= p.nombre.replace(/'/g, "\\'") %>','<%= p.unidad.replace(/'/g, "\\'") %>',<%= p.precio_venta %>)">Editar</button>
+              <form method="post" action="/almacen/productos/<%= p.id %>/eliminar" style="display:inline"
+                    onsubmit="return confirm('¿Quitar este producto del catálogo?')">
+                <button class="btn peligro mini" type="submit">Quitar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (productos.filter(p => p.activo).length === 0) { %>
+          <tr><td colspan="6" class="vacio">Todavía no has cargado productos.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+    <p class="ayuda" style="margin-top:14px">El precio de costo y la ganancia los maneja la administración; por eso no aparecen en esta pantalla.</p>
+  </div>
+</main>
+<script>
+function editar(nombre, unidad, precio){
+  document.getElementById('pNombre').value = nombre;
+  document.getElementById('pUnidad').value = unidad;
+  document.getElementById('pPrecio').value = precio;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>

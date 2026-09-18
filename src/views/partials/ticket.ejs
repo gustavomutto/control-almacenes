@@ -1,0 +1,65 @@
+<%
+  const esTicket = almacen.papel === '80mm' || almacen.papel === '58mm';
+  const titulo = doc.tipo === 'factura' ? (esTicket ? 'FACTURA DE VENTA' : 'FACTURA DE VENTA') : 'COTIZACIÓN';
+%>
+<div class="tk">
+  <div class="c"><%= almacen.encabezado || almacen.nombre %></div>
+  <div class="c"><%= almacen.direccion %></div>
+  <div class="c tk-tipo"><%= titulo %></div>
+  <div class="c">NIT: <%= almacen.nit %></div>
+  <div class="c">Tel: <%= almacen.telefono %></div>
+  <div class="tk-f3">
+    <span>Fecha/Hora:</span>
+    <span class="c"><%= hora %></span>
+    <span class="r"><%= fechaTexto %></span>
+  </div>
+  <div class="tk-f3">
+    <span><%= doc.tipo === 'factura' ? 'Factura Nº:' : 'Cotización Nº:' %></span>
+    <span class="c"><%= doc.numero %></span>
+    <span></span>
+  </div>
+  <div class="tk-cli"><span>CLIENTE</span><span class="r"><%= doc.cliente || 'Consumidor final' %></span></div>
+  <% if (doc.m2) { %>
+    <div class="tk-f2"><span>ÁREA</span><span><%= fmtCant(doc.m2) %> m²</span></div>
+  <% } %>
+
+  <table>
+    <thead>
+      <tr><th class="l">Producto</th><th>cant</th><th>precio</th><th class="r">Total</th></tr>
+    </thead>
+    <tbody>
+      <% items.forEach(i => { %>
+        <tr>
+          <td><%= i.descripcion %></td>
+          <td class="c"><%= fmtCant(i.cantidad) %></td>
+          <td class="r"><%= fmt(i.precio_unit) %></td>
+          <td class="r"><%= fmt(i.total) %></td>
+        </tr>
+      <% }) %>
+      <% if (items.length === 0) { %><tr><td colspan="4">&nbsp;</td></tr><% } %>
+    </tbody>
+  </table>
+
+  <div class="tk-tot">
+    <span>Subtotal</span><span><%= fmt(doc.subtotal) %></span>
+    <span>IVA (19%)</span><span><%= Number(doc.iva) ? fmt(doc.iva) : '—' %></span>
+    <span>Descuento</span><span><%= Number(doc.descuento) ? fmt(doc.descuento) : '—' %></span>
+    <span class="tk-grande">Total a Pagar</span><span class="tk-grande"><%= fmt(doc.total) %></span>
+    <% if (pagos.length === 1 && !Number(doc.cambio)) { %>
+      <span>Método de pago</span><span><%= pagos[0].metodo %></span>
+    <% } else if (pagos.length > 0) { %>
+      <span class="tk-sep"></span><span>Método de pago</span><span></span>
+      <% pagos.forEach(p => { %>
+        <span><%= p.metodo %></span><span><%= fmt(p.valor) %></span>
+      <% }) %>
+      <% if (Number(doc.cambio)) { %><span>Cambio</span><span><%= fmt(doc.cambio) %></span><% } %>
+    <% } %>
+  </div>
+
+  <div class="c tk-pie">
+    <%= doc.tipo === 'factura' ? '¡Gracias por su compra!' : 'Cotización válida por 15 días' %>
+  </div>
+  <div class="c">Le atendió: <%= doc.vendedor || almacen.nombre %></div>
+  <% if (almacen.nota) { %><div class="c tk-nota"><%= almacen.nota %></div><% } %>
+  <% if (doc.anulada) { %><div class="c tk-tipo">*** ANULADA ***</div><% } %>
+</div>

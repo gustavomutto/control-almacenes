@@ -1,0 +1,80 @@
+<%- include('../partials/head', { titulo: 'Precios de costo' }) %>
+<%- include('../partials/barra', { usuario, activo: 'costos' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Precios de costo</h2>
+        <p class="ayuda" style="margin:0">Solo tú y la jefa ven esta pantalla. El personal del almacén no ve los costos ni la ganancia.</p>
+      </div>
+      <form method="get" action="/jefa/costos" style="margin-left:auto">
+        <label class="campo">Almacén
+          <select name="almacen" onchange="this.form.submit()">
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>>
+                <%= a.nombre %><%= a.region_nombre ? ' — ' + a.region_nombre : '' %>
+              </option>
+            <% }) %>
+          </select>
+        </label>
+      </form>
+    </div>
+
+    <% if (sinCosto > 0) { %>
+      <div class="aviso-caja">
+        Hay <b><%= sinCosto %></b> producto(s) sin precio de costo. Mientras no lo tengan, la ganancia de esos
+        productos se calcula como si el material fuera gratis, así que el balance queda inflado.
+      </div>
+    <% } %>
+
+    <form method="post" action="/jefa/costos">
+      <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Producto</th><th>Unidad</th>
+            <th class="n">Precio de venta</th>
+            <th class="n">Precio de costo</th>
+            <th class="n">Ganancia por unidad</th>
+            <th class="n">Existencias</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% productos.forEach(p => { %>
+            <tr<%= Number(p.precio_costo) === 0 ? ' class="sin-stock"' : '' %>>
+              <td><%= p.nombre %></td>
+              <td><%= p.unidad %></td>
+              <td class="n"><%= fmt(p.precio_venta) %></td>
+              <td class="n">
+                <input class="in n" style="max-width:130px" type="number" min="0" step="1"
+                       name="costo_<%= p.id %>" value="<%= Number(p.precio_costo) %>">
+              </td>
+              <td class="n"><%= fmt(p.margen_unit) %></td>
+              <td class="n"><%= p.controla_stock ? fmtCant(p.existencias) : '—' %></td>
+            </tr>
+          <% }) %>
+          <% if (productos.length === 0) { %>
+            <tr><td colspan="6" class="vacio">Este almacén todavía no tiene productos cargados.</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+      <% if (productos.length > 0) { %>
+        <div style="margin-top:16px"><button class="btn prim" type="submit">Guardar precios de costo</button></div>
+      <% } %>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Cómo se calcula la ganancia</h3>
+    <p class="ayuda" style="max-width:80ch">
+      El vendedor factura al precio que quiera. Al guardar cada factura, el sistema toma el precio de costo que
+      esté aquí en ese momento y lo guarda como una foto dentro de la factura. La ganancia real es
+      <b>lo cobrado (sin IVA y ya con el descuento aplicado) menos el costo de la mercancía</b>. Si después cambias
+      el costo de un producto, las facturas viejas no se alteran.
+    </p>
+  </div>
+</main>
+</body>
+</html>

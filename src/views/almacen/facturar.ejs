@@ -1,0 +1,70 @@
+<%- include('../partials/head', { titulo: 'Facturar — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'facturar' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <div class="vista-pos">
+    <div class="trabajo">
+      <div class="buscador">
+        <input id="buscar" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Buscar producto y presionar Enter" aria-label="Buscar producto">
+        <p class="pista">Para agregar varias unidades escribe la cantidad primero: <b>3*lamina</b></p>
+        <ul id="sugerencias" class="sugerencias" hidden></ul>
+      </div>
+
+      <div class="tabla-wrap">
+        <table class="tabla items-venta">
+          <thead><tr><th>Producto</th><th class="n">Cant.</th><th class="n">Precio</th><th class="n">Total</th><th></th></tr></thead>
+          <tbody id="itemsFactura"></tbody>
+        </table>
+        <div class="vacio" id="vacioFactura">Busca un producto arriba y presiona Enter para agregarlo a la venta.</div>
+      </div>
+
+      <div class="campos-venta">
+        <label class="campo">Cliente <input id="fCliente" type="text" autocomplete="off" placeholder="Consumidor final"></label>
+        <label class="campo">Descuento ($) <input id="fDescuento" type="number" min="0" step="1" placeholder="0"></label>
+        <label class="check"><input id="fIva" type="checkbox" <%= almacen.iva_por_defecto ? 'checked' : '' %>> Cobrar IVA 19%</label>
+      </div>
+
+      <div class="pagos">
+        <div class="pagos-cab">
+          <span class="titulo">Forma de pago</span>
+          <button class="btn linea mini" id="btnAgregarPago" type="button">Agregar otro pago</button>
+          <span class="pagos-estado" id="pagosEstado"></span>
+        </div>
+        <div id="listaPagos"></div>
+      </div>
+
+      <div class="cobro">
+        <div class="total"><span>Total a pagar</span><strong id="fTotal">$ 0</strong></div>
+        <div class="acciones">
+          <button class="btn sec" id="btnNueva" type="button">Nueva venta</button>
+          <button class="btn sec" id="btnReimprimir" type="button" <%= ultima ? '' : 'disabled' %>
+                  data-id="<%= ultima ? ultima.id : '' %>">Reimprimir última</button>
+          <button class="btn cobrar" id="btnCobrar" type="button">Cobrar e imprimir</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="papel-wrap">
+      <p class="papel-titulo">Así saldrá impresa — <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %></p>
+      <div class="papel" id="previewFactura"></div>
+    </aside>
+  </div>
+</main>
+
+<script>
+window.APP = {
+  productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, precio: Number(p.precio_venta), existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
+  metodos: <%- JSON.stringify((almacen.metodos_pago || 'Efectivo,Transferencia').split(',').map(s => s.trim()).filter(Boolean)) %>,
+  almacen: <%- JSON.stringify({ nombre: almacen.nombre, encabezado: almacen.encabezado, direccion: almacen.direccion, nit: almacen.nit, telefono: almacen.telefono, nota: almacen.nota, papel: almacen.papel }) %>,
+  numero: <%= proximoNumero %>,
+  vendedor: <%- JSON.stringify(usuario.nombre) %>,
+  tipo: 'factura',
+  endpoint: '/almacen/facturar'
+};
+</script>
+<script src="/js/pos.js"></script>
+</body>
+</html>

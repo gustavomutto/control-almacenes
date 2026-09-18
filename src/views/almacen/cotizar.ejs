@@ -1,0 +1,68 @@
+<%- include('../partials/head', { titulo: 'Cotizar — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'cotizar' }) %>
+<main>
+  <div class="vista-pos">
+    <div class="trabajo">
+      <div class="m2">
+        <label class="campo">Metros cuadrados
+          <input id="cM2" type="number" min="0" step="0.01" placeholder="0">
+        </label>
+        <label class="campo">Cliente <input id="fCliente" type="text" autocomplete="off" placeholder="Nombre del cliente"></label>
+        <label class="check"><input id="fIva" type="checkbox" <%= almacen.iva_por_defecto ? 'checked' : '' %>> Cobrar IVA 19%</label>
+        <button class="btn linea" id="btnCalcular" type="button">Calcular materiales</button>
+      </div>
+
+      <div class="buscador">
+        <input id="buscar" type="text" autocomplete="off" spellcheck="false"
+               placeholder="O busca un producto suelto y presiona Enter" aria-label="Buscar producto">
+        <ul id="sugerencias" class="sugerencias" hidden></ul>
+      </div>
+
+      <div class="tabla-wrap">
+        <table class="tabla items-venta">
+          <thead><tr><th>Material</th><th class="n">Cant.</th><th class="n">Precio</th><th class="n">Total</th><th></th></tr></thead>
+          <tbody id="itemsFactura"></tbody>
+        </table>
+        <div class="vacio" id="vacioFactura">Escribe los metros cuadrados y pulsa «Calcular materiales», o busca productos sueltos.</div>
+      </div>
+      <p class="ayuda" style="padding:0 20px">Las cantidades se redondean hacia arriba y puedes corregirlas antes de imprimir. Los precios salen del catálogo de Productos.</p>
+
+      <div class="campos-venta">
+        <label class="campo">Descuento ($) <input id="fDescuento" type="number" min="0" step="1" placeholder="0"></label>
+      </div>
+
+      <div class="cobro">
+        <div class="total"><span>Total cotización</span><strong id="fTotal">$ 0</strong></div>
+        <div class="acciones">
+          <button class="btn sec" id="btnNueva" type="button">Nueva cotización</button>
+          <button class="btn cobrar" id="btnCobrar" type="button">Guardar e imprimir</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="papel-wrap">
+      <p class="papel-titulo">Así saldrá impresa — <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %></p>
+      <div class="papel" id="previewFactura"></div>
+    </aside>
+  </div>
+</main>
+
+<div id="listaPagos" hidden></div>
+<span id="pagosEstado" hidden></span>
+<button id="btnAgregarPago" type="button" hidden></button>
+
+<script>
+window.APP = {
+  productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, precio: Number(p.precio_venta), existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
+  metodos: [],
+  almacen: <%- JSON.stringify({ nombre: almacen.nombre, encabezado: almacen.encabezado, direccion: almacen.direccion, nit: almacen.nit, telefono: almacen.telefono, nota: almacen.nota, papel: almacen.papel }) %>,
+  numero: 0,
+  vendedor: <%- JSON.stringify(usuario.nombre) %>,
+  tipo: 'cotizacion',
+  endpoint: '/almacen/cotizar',
+  materialesM2: <%- JSON.stringify(materialesM2.map(m => ({ clave: m.clave, nombre: m.nombre, texto: m.texto }))) %>
+};
+</script>
+<script src="/js/cotizar.js"></script>
+</body>
+</html>
