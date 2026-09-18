@@ -1,0 +1,83 @@
+<%- include('../partials/head', { titulo: 'Informe de gastos — Control de almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'gastos' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Informe de gastos</h2>
+        <p class="ayuda" style="margin:0">General y por sede — detalle de cada gasto registrado</p>
+      </div>
+      <form method="get" action="/jefa/gastos" style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+        <label class="campo">Mes <input type="month" name="mes" value="<%= mes %>"></label>
+        <label class="campo">Región
+          <select name="region">
+            <option value="todas" <%= regionFiltro === 'todas' ? 'selected' : '' %>>Todas</option>
+            <% regiones.forEach(r => { %>
+              <option value="<%= r.id %>" <%= String(regionFiltro) === String(r.id) ? 'selected' : '' %>><%= r.nombre %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Almacén
+          <select name="almacen">
+            <option value="todos" <%= almacenFiltro === 'todos' ? 'selected' : '' %>>Todos (consolidado)</option>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>><%= a.nombre %><%= a.region_nombre ? ' — '+a.region_nombre : '' %></option>
+            <% }) %>
+          </select>
+        </label>
+        <button class="btn linea" type="submit" style="align-self:end">Ver</button>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta gastos"><span>Total gastos del mes</span><strong><%= fmt(totalGeneral) %></strong></div>
+    </div>
+
+    <h3 style="margin-top:6px">Por región</h3>
+    <table class="tabla">
+      <thead><tr><th>Región</th><th class="n">Total gastos</th></tr></thead>
+      <tbody>
+        <% subtotalesRegion.forEach(r => { %>
+          <tr><td><%= r.region %></td><td class="n"><%= fmt(r.total) %></td></tr>
+        <% }) %>
+        <% if (subtotalesRegion.length === 0) { %><tr><td colspan="2" class="vacio">Sin gastos este mes.</td></tr><% } %>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:20px">Por almacén</h3>
+    <table class="tabla">
+      <thead><tr><th>Almacén</th><th>Región</th><th class="n">Total gastos</th></tr></thead>
+      <tbody>
+        <% subtotalesAlmacen.forEach(a => { %>
+          <tr><td><%= a.nombre %></td><td><%= a.region || '—' %></td><td class="n"><%= fmt(a.total) %></td></tr>
+        <% }) %>
+        <% if (subtotalesAlmacen.length === 0) { %><tr><td colspan="3" class="vacio">Sin gastos este mes.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Detalle de cada gasto</h3>
+    <table class="tabla">
+      <thead><tr><th>Fecha</th><th>Almacén</th><th>Región</th><th>Concepto</th><th>Categoría</th><th class="n">Valor</th></tr></thead>
+      <tbody>
+        <% detalle.forEach(g => { %>
+          <tr>
+            <td><%= g.fecha.toISOString().slice(0,10) %></td>
+            <td><span class="chip almacen"><%= g.almacen_nombre %></span></td>
+            <td><%= g.region_nombre || '—' %></td>
+            <td><%= g.concepto %></td>
+            <td><%= g.categoria || '—' %></td>
+            <td class="n"><%= fmt(g.valor) %></td>
+          </tr>
+        <% }) %>
+        <% if (detalle.length === 0) { %><tr><td colspan="6" class="vacio">Sin gastos registrados este mes.</td></tr><% } %>
+      </tbody>
+      <% if (detalle.length > 0) { %>
+      <tfoot><tr><td colspan="5">Total</td><td class="n"><%= fmt(totalGeneral) %></td></tr></tfoot>
+      <% } %>
+    </table>
+  </div>
+</main>
+</body>
+</html>

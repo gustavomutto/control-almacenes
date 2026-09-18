@@ -1,0 +1,180 @@
+<%- include('../partials/head', { titulo: almacen.nombre + ' — Control de almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'panel' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px"><%= almacen.nombre %></h2>
+        <p class="ayuda" style="margin:0">Resumen del día</p>
+      </div>
+      <form method="get" action="/almacen" style="margin-left:auto">
+        <label class="campo">Ver fecha
+          <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()">
+        </label>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Vendido</span><strong><%= fmt(totales.total_venta) %></strong></div>
+      <div class="tarjeta"><span>Costo del material vendido</span><strong><%= fmt(totales.total_costo) %></strong></div>
+      <div class="tarjeta margen"><span>Me queda (margen)</span><strong><%= fmt(totales.margen) %></strong></div>
+      <div class="tarjeta gastos"><span>Gastos del día</span><strong><%= fmt(totalGastosHoy) %></strong></div>
+      <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalUnidadesHoy) %></strong></div>
+    </div>
+
+    <h3 style="margin-top:6px">Mercancía vendida hoy, por unidad</h3>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad</th><th class="n">Vendido</th><th class="n">Margen</th></tr></thead>
+      <tbody>
+        <% unidadesHoy.forEach(u => { %>
+          <tr>
+            <td><%= u.material %><%= u.unidad ? ' ('+u.unidad+')' : '' %></td>
+            <td class="n"><%= fmtCant(u.cantidad) %></td>
+            <td class="n"><%= fmt(u.venta) %></td>
+            <td class="n"><%= fmt(u.margen) %></td>
+          </tr>
+        <% }) %>
+        <% if (unidadesHoy.length === 0) { %><tr><td colspan="4" class="vacio">Sin ventas registradas este día.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3 id="form-material">Materiales — precio de costo y de venta</h3>
+    <p class="ayuda">Sube aquí cada material con lo que te cuesta (precio de costo) y en cuánto lo vendes (precio de venta). Si ya existe un material con el mismo nombre, se actualiza su precio.</p>
+    <form method="post" action="/almacen/materiales">
+      <div class="rejilla tres">
+        <label class="campo ancho" style="grid-column:1/2">Nombre del material <input type="text" name="nombre" id="matNombre" required></label>
+        <label class="campo">Unidad <input type="text" name="unidad" id="matUnidad" placeholder="Ej: metro, unidad, kg" value="unidad"></label>
+        <label class="campo">Precio de costo <input type="number" name="precio_costo" id="matCosto" min="0" step="0.01" required></label>
+        <label class="campo">Precio de venta <input type="number" name="precio_venta" id="matVenta" min="0" step="0.01" required></label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Guardar material</button></div>
+    </form>
+
+    <table class="tabla" style="margin-top:20px">
+      <thead><tr><th>Material</th><th>Unidad</th><th class="n">Precio costo</th><th class="n">Precio venta</th><th class="n">Margen unitario</th><th></th></tr></thead>
+      <tbody>
+        <% materiales.forEach(m => { %>
+          <tr>
+            <td><%= m.nombre %></td>
+            <td><%= m.unidad %></td>
+            <td class="n"><%= fmt(m.precio_costo) %></td>
+            <td class="n"><%= fmt(m.precio_venta) %></td>
+            <td class="n"><%= fmt(m.precio_venta - m.precio_costo) %></td>
+            <td class="n">
+              <button type="button" class="btn linea mini" onclick="editarMaterial('<%= m.nombre.replace(/'/g,"\\'") %>','<%= m.unidad.replace(/'/g,"\\'") %>',<%= m.precio_costo %>,<%= m.precio_venta %>)">Editar</button>
+              <form method="post" action="/almacen/materiales/<%= m.id %>/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar este material?')">
+                <button class="btn peligro mini" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (materiales.length === 0) { %><tr><td colspan="6" class="vacio">Todavía no has subido materiales.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Registrar venta</h3>
+    <form method="post" action="/almacen/ventas">
+      <div class="rejilla tres">
+        <label class="campo">Material
+          <select name="material_id" id="ventaMaterial" onchange="toggleManual()">
+            <option value="">— Otro / no está en la lista —</option>
+            <% materiales.forEach(m => { %>
+              <option value="<%= m.id %>"><%= m.nombre %> (venta <%= fmt(m.precio_venta) %>)</option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Cantidad <input type="number" name="cantidad" min="0.01" step="0.01" required></label>
+        <label class="campo">Fecha <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>"></label>
+      </div>
+      <div id="camposManual" class="rejilla tres" style="margin-top:12px">
+        <label class="campo ancho" style="grid-column:1/2">Descripción <input type="text" name="descripcion" placeholder="¿Qué vendiste?"></label>
+        <label class="campo">Precio de costo unitario <input type="number" name="precio_costo_unit" min="0" step="0.01"></label>
+        <label class="campo">Precio de venta unitario <input type="number" name="precio_venta_unit" min="0" step="0.01"></label>
+      </div>
+      <div style="margin-top:14px"><button class="btn amber" type="submit">Registrar venta</button></div>
+    </form>
+
+    <table class="tabla" style="margin-top:20px">
+      <thead><tr><th>Descripción</th><th class="n">Cant.</th><th class="n">Venta</th><th class="n">Costo</th><th class="n">Margen</th><th></th></tr></thead>
+      <tbody>
+        <% ventas.forEach(v => { %>
+          <tr>
+            <td><%= v.material_nombre || v.descripcion %></td>
+            <td class="n"><%= fmtCant(v.cantidad) %></td>
+            <td class="n"><%= fmt(v.total_venta) %></td>
+            <td class="n"><%= fmt(v.total_costo) %></td>
+            <td class="n"><%= fmt(v.margen) %></td>
+            <td class="n">
+              <form method="post" action="/almacen/ventas/<%= v.id %>/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar esta venta?')">
+                <button class="btn peligro mini" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (ventas.length === 0) { %><tr><td colspan="6" class="vacio">Sin ventas registradas este día.</td></tr><% } %>
+      </tbody>
+      <% if (ventas.length > 0) { %>
+      <tfoot><tr><td>Total</td><td></td><td class="n"><%= fmt(totales.total_venta) %></td><td class="n"><%= fmt(totales.total_costo) %></td><td class="n"><%= fmt(totales.margen) %></td><td></td></tr></tfoot>
+      <% } %>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Registrar gasto</h3>
+    <form method="post" action="/almacen/gastos">
+      <div class="rejilla tres">
+        <label class="campo ancho" style="grid-column:1/2">Concepto <input type="text" name="concepto" placeholder="Ej: arriendo, nómina, transporte" required></label>
+        <label class="campo">Categoría (opcional) <input type="text" name="categoria"></label>
+        <label class="campo">Valor <input type="number" name="valor" min="0.01" step="0.01" required></label>
+      </div>
+      <input type="hidden" name="fecha" value="<%= fecha %>">
+      <div style="margin-top:14px"><button class="btn linea" type="submit">Registrar gasto</button></div>
+    </form>
+
+    <table class="tabla" style="margin-top:20px">
+      <thead><tr><th>Concepto</th><th>Categoría</th><th class="n">Valor</th><th></th></tr></thead>
+      <tbody>
+        <% gastos.forEach(g => { %>
+          <tr>
+            <td><%= g.concepto %></td>
+            <td><%= g.categoria || '—' %></td>
+            <td class="n"><%= fmt(g.valor) %></td>
+            <td class="n">
+              <form method="post" action="/almacen/gastos/<%= g.id %>/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar este gasto?')">
+                <button class="btn peligro mini" type="submit">Eliminar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (gastos.length === 0) { %><tr><td colspan="4" class="vacio">Sin gastos registrados este día.</td></tr><% } %>
+      </tbody>
+      <% if (gastos.length > 0) { %>
+      <tfoot><tr><td>Total</td><td></td><td class="n"><%= fmt(totalGastosHoy) %></td><td></td></tr></tfoot>
+      <% } %>
+    </table>
+  </div>
+</main>
+<script>
+function toggleManual(){
+  const sel = document.getElementById('ventaMaterial');
+  const manual = document.getElementById('camposManual');
+  manual.style.display = sel.value ? 'none' : 'grid';
+}
+function editarMaterial(nombre, unidad, costo, venta){
+  document.getElementById('matNombre').value = nombre;
+  document.getElementById('matUnidad').value = unidad;
+  document.getElementById('matCosto').value = costo;
+  document.getElementById('matVenta').value = venta;
+  document.getElementById('form-material').scrollIntoView({behavior:'smooth'});
+}
+toggleManual();
+</script>
+</body>
+</html>

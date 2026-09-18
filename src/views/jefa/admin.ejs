@@ -1,0 +1,108 @@
+<%- include('../partials/head', { titulo: 'Almacenes y usuarios' }) %>
+<%- include('../partials/barra', { usuario, activo: 'admin' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (tempPassword) { %>
+    <div class="aviso-caja">
+      <b>Guarda esta clave ahora, no se volverá a mostrar:</b><br>
+      Usuario: <b><%= tempUsuario %></b> &nbsp; Clave: <b><%= tempPassword %></b>
+    </div>
+  <% } %>
+
+  <div class="panel">
+    <h3>Regiones</h3>
+    <p class="ayuda">Agrupan varios almacenes (ej: Valledupar). Crea una región y luego asígnala a cada almacén.</p>
+    <table class="tabla">
+      <thead><tr><th>Nombre</th><th>Estado</th></tr></thead>
+      <tbody>
+        <% regiones.forEach(r => { %>
+          <tr><td><%= r.nombre %></td><td><%= r.activo ? 'Activa' : 'Inactiva' %></td></tr>
+        <% }) %>
+        <% if (regiones.length === 0) { %><tr><td colspan="2" class="vacio">Todavía no hay regiones.</td></tr><% } %>
+      </tbody>
+    </table>
+    <form method="post" action="/jefa/admin/regiones" style="margin-top:16px;display:flex;gap:10px;align-items:end">
+      <label class="campo" style="flex:1">Nueva región <input type="text" name="nombre" placeholder="Ej: Valledupar" required></label>
+      <button class="btn prim" type="submit">Crear región</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Almacenes</h3>
+    <table class="tabla">
+      <thead><tr><th>Nombre</th><th>Región</th><th>Estado</th></tr></thead>
+      <tbody>
+        <% almacenes.forEach(a => { %>
+          <tr><td><%= a.nombre %></td><td><%= a.region_nombre || '—' %></td><td><%= a.activo ? 'Activo' : 'Inactivo' %></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <form method="post" action="/jefa/admin/almacenes" style="margin-top:16px;display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <label class="campo" style="flex:1">Nuevo almacén <input type="text" name="nombre" placeholder="Ej: Almacén 5" required></label>
+      <label class="campo">Región
+        <select name="region_id">
+          <option value="">Sin región</option>
+          <% regiones.forEach(r => { %><option value="<%= r.id %>"><%= r.nombre %></option><% }) %>
+        </select>
+      </label>
+      <button class="btn prim" type="submit">Crear almacén</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h3>Usuarios</h3>
+    <table class="tabla">
+      <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Almacén</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        <% usuarios.forEach(u => { %>
+          <tr>
+            <td><%= u.usuario %></td>
+            <td><%= u.nombre %></td>
+            <td><%= u.rol %></td>
+            <td><%= u.almacen_nombre || '—' %></td>
+            <td><%= u.activo ? 'Activo' : 'Inactivo' %></td>
+            <td class="n">
+              <% if (u.activo) { %>
+                <form method="post" action="/jefa/admin/usuarios/<%= u.id %>/desactivar" style="display:inline" onsubmit="return confirm('¿Desactivar este usuario?')">
+                  <button class="btn peligro mini" type="submit">Desactivar</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:24px">Crear usuario</h3>
+    <form method="post" action="/jefa/admin/usuarios">
+      <div class="rejilla tres">
+        <label class="campo">Nombre completo <input type="text" name="nombre" required></label>
+        <label class="campo">Usuario (para iniciar sesión) <input type="text" name="usuario" required></label>
+        <label class="campo">Rol
+          <select name="rol" id="rolSel" onchange="toggleAlmacen()">
+            <option value="almacen">Personal de almacén</option>
+            <option value="jefa">Jefa (vista consolidada, solo lectura)</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </label>
+      </div>
+      <div id="campoAlmacen" class="rejilla tres" style="margin-top:12px">
+        <label class="campo">Almacén
+          <select name="almacen_id">
+            <% almacenes.forEach(a => { %><option value="<%= a.id %>"><%= a.nombre %><%= a.region_nombre ? ' — '+a.region_nombre : '' %></option><% }) %>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Crear usuario</button></div>
+    </form>
+  </div>
+</main>
+<script>
+function toggleAlmacen(){
+  const rol = document.getElementById('rolSel').value;
+  document.getElementById('campoAlmacen').style.display = rol === 'almacen' ? 'grid' : 'none';
+}
+toggleAlmacen();
+</script>
+</body>
+</html>

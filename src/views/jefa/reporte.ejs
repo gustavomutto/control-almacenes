@@ -1,0 +1,93 @@
+<%- include('../partials/head', { titulo: 'Reporte mensual — Control de almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'reporte' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Reporte mensual</h2>
+        <p class="ayuda" style="margin:0">Ganancia real total del mes y gastos, por región y almacén</p>
+      </div>
+      <form method="get" action="/jefa/reporte" style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
+        <label class="campo">Mes <input type="month" name="mes" value="<%= mes %>"></label>
+        <label class="campo">Región
+          <select name="region">
+            <option value="todas" <%= regionFiltro === 'todas' ? 'selected' : '' %>>Todas</option>
+            <% regiones.forEach(r => { %>
+              <option value="<%= r.id %>" <%= String(regionFiltro) === String(r.id) ? 'selected' : '' %>><%= r.nombre %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Almacén
+          <select name="almacen">
+            <option value="todos" <%= almacenFiltro === 'todos' ? 'selected' : '' %>>Todos (consolidado)</option>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>><%= a.nombre %><%= a.region_nombre ? ' — '+a.region_nombre : '' %></option>
+            <% }) %>
+          </select>
+        </label>
+        <button class="btn linea" type="submit" style="align-self:end">Ver</button>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Vendido en el mes</span><strong><%= fmt(totalGeneral.venta) %></strong></div>
+      <div class="tarjeta"><span>Costo del material</span><strong><%= fmt(totalGeneral.costo) %></strong></div>
+      <div class="tarjeta margen"><span>Ganancia real total (sin descontar gastos)</span><strong><%= fmt(totalGeneral.margen) %></strong></div>
+      <div class="tarjeta gastos"><span>Gastos del mes</span><strong><%= fmt(totalGeneral.gastos) %></strong></div>
+      <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalGeneral.unidades) %></strong></div>
+    </div>
+    <p class="ayuda">La "ganancia real total" es la suma de los márgenes (venta − costo de material) de todo el mes. Los gastos se muestran aparte, sin restarse de esa ganancia. Para el detalle de cada gasto, ve a <a href="/jefa/gastos?mes=<%= mes %>">Informe de gastos</a>.</p>
+
+    <table class="tabla">
+      <thead><tr><th>Almacén</th><th>Región</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Ganancia real</th><th class="n">Gastos</th><th class="n">Unidades</th></tr></thead>
+      <tbody>
+        <% filasAlmacen.forEach(f => { %>
+          <tr>
+            <td><span class="chip almacen"><%= f.almacen.nombre %></span></td>
+            <td><%= f.almacen.region_nombre || '—' %></td>
+            <td class="n"><%= fmt(f.venta) %></td>
+            <td class="n"><%= fmt(f.costo) %></td>
+            <td class="n"><%= fmt(f.margen) %></td>
+            <td class="n"><%= fmt(f.gastos) %></td>
+            <td class="n"><%= fmtCant(f.unidades) %></td>
+          </tr>
+        <% }) %>
+        <% if (filasAlmacen.length === 0) { %><tr><td colspan="7" class="vacio">Sin datos para este mes.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Mercancía vendida en el mes, por unidad</h3>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad vendida</th></tr></thead>
+      <tbody>
+        <% unidadesMaterial.forEach(u => { %>
+          <tr><td><%= u.material %></td><td class="n"><%= fmtCant(u.cantidad) %></td></tr>
+        <% }) %>
+        <% if (unidadesMaterial.length === 0) { %><tr><td colspan="2" class="vacio">Sin ventas registradas este mes.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Día a día</h3>
+    <table class="tabla">
+      <thead><tr><th>Día</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen</th><th class="n">Unidades</th></tr></thead>
+      <tbody>
+        <% porDia.forEach(d => { %>
+          <tr>
+            <td><%= d.fecha.toISOString().slice(0,10) %></td>
+            <td class="n"><%= fmt(d.venta) %></td>
+            <td class="n"><%= fmt(d.costo) %></td>
+            <td class="n"><%= fmt(d.margen) %></td>
+            <td class="n"><%= fmtCant(d.unidades) %></td>
+          </tr>
+        <% }) %>
+        <% if (porDia.length === 0) { %><tr><td colspan="5" class="vacio">Sin ventas registradas este mes.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>
