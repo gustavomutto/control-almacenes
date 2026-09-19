@@ -88,6 +88,16 @@ Las claves las escribe quien administra (mínimo 4 caracteres); el sistema no la
 azar. Desde «Almacenes y usuarios» se crea un usuario con su clave y se le puede poner una
 clave nueva en cualquier momento.
 
+### Si te quedas por fuera (nadie puede entrar como administrador)
+
+1. En Railway, en el servicio, crea la variable **`CLAVE_ADMIN`** con la clave que quieras
+   (o `CLAVE_JEFA` para el usuario de la jefa).
+2. Railway vuelve a desplegar solo. Al arrancar, esa clave queda puesta y en los registros
+   aparece `CLAVE RESTABLECIDA...`.
+3. Entra con esa clave y **borra la variable** de Railway, para que no quede escrita ahí.
+
+Sin esa variable el sistema no toca ninguna clave existente.
+
 ## Zona horaria
 
 Todo se calcula con la hora del negocio (`America/Bogota`, configurable con la variable

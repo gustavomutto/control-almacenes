@@ -15,6 +15,35 @@ const ALMACENES = (process.env.SEED_ALMACENES || 'Almacén 1,Almacén 2,Almacén
   .map((s) => s.trim())
   .filter(Boolean);
 
+// Rescate: si te quedas por fuera y nadie puede entrar como administrador,
+// crea en Railway la variable CLAVE_ADMIN (y/o CLAVE_JEFA) con la clave que quieras.
+// En el siguiente despliegue se le pone esa clave a ese usuario. Después
+// BORRA la variable, para que la clave no quede escrita en la configuración.
+async function rescatarClaves(client) {
+  const rescates = [
+    ['admin', process.env.CLAVE_ADMIN],
+    ['jefa', process.env.CLAVE_JEFA],
+  ];
+
+  for (const [rol, clave] of rescates) {
+    if (!clave || String(clave).length < 4) continue;
+    const hash = await bcrypt.hash(String(clave), 10);
+    const { rows } = await client.query(
+      `UPDATE usuarios SET password_hash = $1, activo = true WHERE rol = $2 RETURNING usuario`,
+      [hash, rol]
+    );
+    if (rows.length > 0) {
+      console.log(
+        `CLAVE RESTABLECIDA para el rol "${rol}" (usuario: ${rows
+          .map((r) => r.usuario)
+          .join(', ')}). Borra ya la variable de Railway.`
+      );
+    } else {
+      console.log(`No hay ningún usuario con rol "${rol}" al que restablecerle la clave.`);
+    }
+  }
+}
+
 async function seed() {
   const client = await pool.connect();
   const credenciales = [];
@@ -74,6 +103,8 @@ async function seed() {
         credenciales.push({ usuario: usuarioLogin, password: pass, rol: `personal de ${nombre}` });
       }
     }
+
+    await rescatarClaves(client);
 
     await client.query('COMMIT');
   } catch (err) {
