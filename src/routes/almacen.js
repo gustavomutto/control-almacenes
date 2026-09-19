@@ -1,13 +1,10 @@
 const express = require('express');
 const pool = require('../db/pool');
+const { hoyISO } = require('../lib/fecha');
 const { calcularTotales, MATERIALES_M2 } = require('../lib/calculos');
 const { papelCss, fechaTexto, horaTexto } = require('../lib/impresion');
 
 const router = express.Router();
-
-function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 async function cargarAlmacen(almacenId) {
   const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1', [almacenId]);
@@ -109,13 +106,13 @@ async function crearDocumento({ almacenId, usuarioId, tipo, cuerpo }) {
     const { rows: docRows } = await client.query(
       `INSERT INTO documentos
         (almacen_id, tipo, numero, fecha, cliente, m2, subtotal, descuento, iva, total, costo_total, margen, cambio, registrado_por)
-       VALUES ($1,$2,$3,COALESCE($4, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING id`,
       [
         almacenId,
         tipo,
         numero,
-        cuerpo.fecha || null,
+        cuerpo.fecha || hoyISO(), // fecha del negocio, no la del servidor (UTC)
         String(cuerpo.cliente || '').slice(0, 160),
         cuerpo.m2 ? Number(cuerpo.m2) : null,
         tot.subtotal,

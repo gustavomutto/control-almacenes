@@ -1,12 +1,17 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
 const pool = require('../db/pool');
+const { hoyISO } = require('../lib/fecha');
+const { leerInventario, plantillaExcel } = require('../lib/importar');
 
 const router = express.Router();
 
-function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+// El archivo se lee en memoria y se descarta; nunca se guarda en el servidor.
+const subida = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+});
 
 const SQL_ALMACENES = `SELECT a.*, r.nombre AS region_nombre FROM almacenes a
   LEFT JOIN regiones r ON r.id = a.region_id
@@ -293,6 +298,147 @@ router.post('/costos', async (req, res) => {
   );
 });
 
+// ======================= IMPORTAR INVENTARIO DESDE EXCEL =======================
+
+router.get('/importar', async (req, res) => {
+  const almacenes = await pool.query(SQL_ALMACENES);
+  res.render('jefa/importar', {
+    almacenes: almacenes.rows,
+    almacenFiltro: req.query.almacen || (almacenes.rows[0] ? String(almacenes.rows[0].id) : ''),
+    previo: null,
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+    activo: 'importar',
+  });
+});
+
+router.get('/importar/plantilla', (req, res) => {
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla_inventario.xlsx"');
+  res.send(plantillaExcel());
+});
+
+// Paso 1: leer el archivo y mostrar qué va a pasar, sin tocar la base de datos.
+router.post('/importar/revisar', subida.single('archivo'), async (req, res) => {
+  const almacenes = await pool.query(SQL_ALMACENES);
+  const almacenId = req.body.almacen_id;
+
+  if (!req.file || !almacenId) {
+    return res.redirect('/jefa/importar?error=' + encodeURIComponent('Elige el almacén y el archivo.'));
+  }
+
+  let lectura;
+  try {
+    lectura = leerInventario(req.file.buffer);
+  } catch (err) {
+    return res.redirect(
+      '/jefa/importar?error=' + encodeURIComponent('No pude leer el archivo. ¿Es un Excel (.xlsx) o un CSV?')
+    );
+  }
+
+  if (lectura.filas.length === 0) {
+    return res.redirect(
+      '/jefa/importar?error=' + encodeURIComponent(lectura.errores[0] || 'El archivo no tiene productos.')
+    );
+  }
+
+  // ¿Cuáles ya existen en ese almacén? Para avisar qué se crea y qué se actualiza.
+  const { rows: existentes } = await pool.query(
+    'SELECT id, nombre, precio_venta, precio_costo, existencias FROM productos WHERE almacen_id = $1',
+    [almacenId]
+  );
+  const porNombre = new Map(existentes.map((p) => [p.nombre.toLowerCase(), p]));
+
+  const filas = lectura.filas.map((f) => {
+    const actual = porNombre.get(f.nombre.toLowerCase());
+    return { ...f, accion: actual ? 'actualizar' : 'crear', actual: actual || null };
+  });
+
+  res.render('jefa/importar', {
+    almacenes: almacenes.rows,
+    almacenFiltro: String(almacenId),
+    previo: {
+      filas,
+      errores: lectura.errores,
+      columnas: lectura.columnasDetectadas,
+      modoExistencias: req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar',
+      nombreArchivo: req.file.originalname,
+      nuevos: filas.filter((f) => f.accion === 'crear').length,
+      actualizados: filas.filter((f) => f.accion === 'actualizar').length,
+    },
+    mensaje: null,
+    error: null,
+    activo: 'importar',
+  });
+});
+
+// Paso 2: aplicar lo revisado.
+router.post('/importar/aplicar', async (req, res) => {
+  const almacenId = req.body.almacen_id;
+  const modo = req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar';
+
+  let filas;
+  try {
+    filas = JSON.parse(req.body.filas || '[]');
+  } catch (err) {
+    return res.redirect('/jefa/importar?error=' + encodeURIComponent('Se perdió la vista previa. Sube el archivo otra vez.'));
+  }
+  if (!Array.isArray(filas) || filas.length === 0 || !almacenId) {
+    return res.redirect('/jefa/importar?error=' + encodeURIComponent('No hay nada que importar.'));
+  }
+
+  const client = await pool.connect();
+  let creados = 0;
+  let actualizados = 0;
+  try {
+    await client.query('BEGIN');
+    for (const f of filas) {
+      const nombre = String(f.nombre || '').trim();
+      if (!nombre) continue;
+
+      const existencias = Number(f.existencias) || 0;
+      const { rows } = await client.query(
+        `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, precio_costo, existencias, controla_stock)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (almacen_id, nombre) DO UPDATE SET
+           unidad = EXCLUDED.unidad,
+           precio_venta = EXCLUDED.precio_venta,
+           precio_costo = EXCLUDED.precio_costo,
+           existencias = CASE WHEN $8 = 'sumar' THEN productos.existencias + EXCLUDED.existencias
+                              ELSE EXCLUDED.existencias END,
+           controla_stock = EXCLUDED.controla_stock,
+           activo = true,
+           actualizado_en = now()
+         RETURNING (xmax = 0) AS fue_creado`,
+        [
+          almacenId,
+          nombre,
+          String(f.unidad || 'unidad').slice(0, 30),
+          Number(f.precio_venta) || 0,
+          Number(f.precio_costo) || 0,
+          existencias,
+          f.controla_stock !== false,
+          modo,
+        ]
+      );
+      if (rows[0].fue_creado) creados++;
+      else actualizados++;
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error importando inventario:', err);
+    return res.redirect('/jefa/importar?error=' + encodeURIComponent('No se pudo guardar: ' + err.message));
+  } finally {
+    client.release();
+  }
+
+  res.redirect(
+    `/jefa/importar?almacen=${almacenId}&ok=` +
+      encodeURIComponent(`Listo: ${creados} producto(s) nuevo(s) y ${actualizados} actualizado(s).`)
+  );
+});
+
 // ======================= ADMINISTRACIÓN =======================
 
 function soloAdmin(req, res, next) {
@@ -382,22 +528,24 @@ router.post('/admin/almacenes/:id/eliminar', soloAdmin, async (req, res) => {
   res.redirect('/jefa/admin?ok=' + encodeURIComponent(`Almacén «${rows[0].nombre}» eliminado con todos sus datos.`));
 });
 
-function generarPassword() {
-  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let out = '';
-  for (let i = 0; i < 10; i++) out += letras[Math.floor(Math.random() * letras.length)];
-  return out;
-}
+const CLAVE_MINIMA = 4;
 
 router.post('/admin/usuarios', soloAdmin, async (req, res) => {
-  const { nombre, usuario, rol, almacen_id } = req.body;
+  const { nombre, usuario, rol, almacen_id, password } = req.body;
   if (!nombre || !usuario || !rol) return res.redirect('/jefa/admin');
   if (rol === 'almacen' && !almacen_id) {
     return res.redirect('/jefa/admin?error=' + encodeURIComponent('Elige un almacén para este usuario.'));
   }
 
-  const pass = generarPassword();
-  const hash = await bcrypt.hash(pass, 10);
+  // La clave la escribe quien administra; no se genera sola.
+  const clave = String(password || '');
+  if (clave.length < CLAVE_MINIMA) {
+    return res.redirect(
+      '/jefa/admin?error=' + encodeURIComponent(`La clave debe tener al menos ${CLAVE_MINIMA} caracteres.`)
+    );
+  }
+
+  const hash = await bcrypt.hash(clave, 10);
   const limpio = usuario.trim().toLowerCase();
 
   try {
@@ -409,9 +557,7 @@ router.post('/admin/usuarios', soloAdmin, async (req, res) => {
     return res.redirect('/jefa/admin?error=' + encodeURIComponent('Ese nombre de usuario ya existe.'));
   }
 
-  res.redirect(
-    `/jefa/admin?ok=${encodeURIComponent('Usuario creado.')}&u=${encodeURIComponent(limpio)}&pass=${encodeURIComponent(pass)}`
-  );
+  res.redirect(`/jefa/admin?ok=` + encodeURIComponent(`Usuario «${limpio}» creado con la clave que escribiste.`));
 });
 
 // Cambiar el usuario de inicio de sesión, el nombre visible y el almacén.
@@ -455,17 +601,23 @@ router.post('/admin/usuarios/:id/editar', soloAdmin, async (req, res) => {
   res.redirect('/jefa/admin?ok=' + encodeURIComponent('Usuario actualizado.'));
 });
 
+// Poner una clave nueva escrita por quien administra (no generada al azar).
 router.post('/admin/usuarios/:id/clave', soloAdmin, async (req, res) => {
-  const pass = generarPassword();
-  const hash = await bcrypt.hash(pass, 10);
-  const { rows } = await pool.query(
-    'UPDATE usuarios SET password_hash = $1 WHERE id = $2 RETURNING usuario',
-    [hash, req.params.id]
-  );
-  if (rows.length === 0) return res.redirect('/jefa/admin');
-  res.redirect(
-    `/jefa/admin?ok=${encodeURIComponent('Clave nueva generada.')}&u=${encodeURIComponent(rows[0].usuario)}&pass=${encodeURIComponent(pass)}`
-  );
+  const clave = String(req.body.password || '');
+  if (clave.length < CLAVE_MINIMA) {
+    return res.redirect(
+      '/jefa/admin?error=' + encodeURIComponent(`La clave debe tener al menos ${CLAVE_MINIMA} caracteres.`)
+    );
+  }
+
+  const hash = await bcrypt.hash(clave, 10);
+  const { rows } = await pool.query('UPDATE usuarios SET password_hash = $1 WHERE id = $2 RETURNING usuario', [
+    hash,
+    req.params.id,
+  ]);
+  if (rows.length === 0) return res.redirect('/jefa/admin?error=' + encodeURIComponent('Usuario no encontrado.'));
+
+  res.redirect('/jefa/admin?ok=' + encodeURIComponent(`Clave de «${rows[0].usuario}» cambiada.`));
 });
 
 router.post('/admin/usuarios/:id/desactivar', soloAdmin, async (req, res) => {

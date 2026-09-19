@@ -15,15 +15,16 @@
     <div class="tarjetas">
       <div class="tarjeta venta"><span>Vendido hoy (todos)</span><strong><%= fmt(totales.venta) %></strong></div>
       <div class="tarjeta"><span>Costo del material</span><strong><%= fmt(totales.costo) %></strong></div>
-      <div class="tarjeta margen"><span>Ganancia real de hoy</span><strong><%= fmt(totales.margen) %></strong></div>
+      <div class="tarjeta margen"><span>Ganancia bruta de hoy</span><strong><%= fmt(totales.margen) %></strong></div>
       <div class="tarjeta gastos"><span>Gastos de hoy</span><strong><%= fmt(totales.gastos) %></strong></div>
+      <div class="tarjeta neta"><span>Lo que queda (neto)</span><strong><%= fmt(totales.margen - totales.gastos) %></strong></div>
       <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalUnidadesHoy) %></strong></div>
     </div>
 
     <% regiones.forEach(region => { %>
       <h3 style="margin-top:18px"><%= region.nombre %></h3>
       <table class="tabla">
-        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Ganancia bruta</th><th class="n">Gastos</th><th class="n">Neto</th></tr></thead>
         <tbody>
           <% region.filas.forEach(f => { %>
             <tr>
@@ -32,6 +33,7 @@
               <td class="n"><%= fmt(f.costo) %></td>
               <td class="n"><%= fmt(f.margen) %></td>
               <td class="n"><%= fmt(f.gastos) %></td>
+              <td class="n"><b><%= fmt(f.margen - f.gastos) %></b></td>
             </tr>
           <% }) %>
         </tbody>
@@ -41,7 +43,7 @@
     <% if (sinRegion.length > 0) { %>
       <h3 style="margin-top:18px">Sin región asignada</h3>
       <table class="tabla">
-        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Margen (me queda)</th><th class="n">Gastos</th></tr></thead>
+        <thead><tr><th>Almacén</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Ganancia bruta</th><th class="n">Gastos</th><th class="n">Neto</th></tr></thead>
         <tbody>
           <% sinRegion.forEach(f => { %>
             <tr>
@@ -50,6 +52,7 @@
               <td class="n"><%= fmt(f.costo) %></td>
               <td class="n"><%= fmt(f.margen) %></td>
               <td class="n"><%= fmt(f.gastos) %></td>
+              <td class="n"><b><%= fmt(f.margen - f.gastos) %></b></td>
             </tr>
           <% }) %>
         </tbody>

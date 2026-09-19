@@ -140,3 +140,4 @@ tr.anulada td{opacity:.55;text-decoration:line-through}
   .trabajo{min-height:0}
   .campos-venta,.m2{grid-template-columns:1fr}
 }
+.tarjeta.neta strong{color:var(--blue)}

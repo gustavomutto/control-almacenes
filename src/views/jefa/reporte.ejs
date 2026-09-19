@@ -5,7 +5,7 @@
     <div class="fila-filtro">
       <div>
         <h2 style="margin-bottom:2px">Reporte mensual</h2>
-        <p class="ayuda" style="margin:0">Ganancia real total del mes y gastos, por región y almacén</p>
+        <p class="ayuda" style="margin:0">Ganancia bruta, gastos y lo que realmente queda, por región y almacén</p>
       </div>
       <form method="get" action="/jefa/reporte" style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap">
         <label class="campo">Mes <input type="month" name="mes" value="<%= mes %>"></label>
@@ -32,14 +32,15 @@
     <div class="tarjetas">
       <div class="tarjeta venta"><span>Vendido en el mes</span><strong><%= fmt(totalGeneral.venta) %></strong></div>
       <div class="tarjeta"><span>Costo del material</span><strong><%= fmt(totalGeneral.costo) %></strong></div>
-      <div class="tarjeta margen"><span>Ganancia real total (sin descontar gastos)</span><strong><%= fmt(totalGeneral.margen) %></strong></div>
+      <div class="tarjeta margen"><span>Ganancia bruta del mes</span><strong><%= fmt(totalGeneral.margen) %></strong></div>
       <div class="tarjeta gastos"><span>Gastos del mes</span><strong><%= fmt(totalGeneral.gastos) %></strong></div>
+      <div class="tarjeta neta"><span>Ganancia neta (ya con gastos)</span><strong><%= fmt(totalGeneral.margen - totalGeneral.gastos) %></strong></div>
       <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(totalGeneral.unidades) %></strong></div>
     </div>
-    <p class="ayuda">La "ganancia real total" es la suma de los márgenes (venta − costo de material) de todo el mes. Los gastos se muestran aparte, sin restarse de esa ganancia. Para el detalle de cada gasto, ve a <a href="/jefa/gastos?mes=<%= mes %>">Informe de gastos</a>.</p>
+    <p class="ayuda">La <b>ganancia bruta</b> es lo cobrado menos el costo de la mercancía vendida. La <b>ganancia neta</b> es esa ganancia ya con los gastos del mes descontados: es lo que realmente queda. Para el detalle de cada gasto, ve a <a href="/jefa/gastos?mes=<%= mes %>">Informe de gastos</a>.</p>
 
     <table class="tabla">
-      <thead><tr><th>Almacén</th><th>Región</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Ganancia real</th><th class="n">Gastos</th><th class="n">Unidades</th></tr></thead>
+      <thead><tr><th>Almacén</th><th>Región</th><th class="n">Vendido</th><th class="n">Costo</th><th class="n">Ganancia bruta</th><th class="n">Gastos</th><th class="n">Ganancia neta</th><th class="n">Unidades</th></tr></thead>
       <tbody>
         <% filasAlmacen.forEach(f => { %>
           <tr>
@@ -49,10 +50,11 @@
             <td class="n"><%= fmt(f.costo) %></td>
             <td class="n"><%= fmt(f.margen) %></td>
             <td class="n"><%= fmt(f.gastos) %></td>
+            <td class="n"><b><%= fmt(f.margen - f.gastos) %></b></td>
             <td class="n"><%= fmtCant(f.unidades) %></td>
           </tr>
         <% }) %>
-        <% if (filasAlmacen.length === 0) { %><tr><td colspan="7" class="vacio">Sin datos para este mes.</td></tr><% } %>
+        <% if (filasAlmacen.length === 0) { %><tr><td colspan="8" class="vacio">Sin datos para este mes.</td></tr><% } %>
       </tbody>
     </table>
   </div>

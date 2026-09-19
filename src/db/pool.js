@@ -11,9 +11,14 @@ if (!connectionString) {
 
 const useSsl = /sslmode=require/.test(connectionString) || process.env.PGSSL === 'true';
 
+// La base también trabaja en la hora del negocio: así CURRENT_DATE y now() coinciden
+// con el día real en Colombia y no con el del servidor (que corre en UTC).
+const ZONA = process.env.ZONA_HORARIA || 'America/Bogota';
+
 const pool = new Pool({
   connectionString,
   ssl: useSsl ? { rejectUnauthorized: false } : false,
+  options: `-c timezone=${ZONA}`,
 });
 
 module.exports = pool;

@@ -62,13 +62,38 @@ productos y gastos). Los reportes de la jefa agrupan por sede.
 
 ## Cómo se calcula la ganancia
 
-En «Costos» la administración define el precio de costo de cada producto. Al guardar una
-factura, el sistema toma ese costo y lo guarda como una foto dentro de la factura, así que
-cambiar el costo después no altera las facturas viejas.
+En «Costos» la administración elige un almacén y define el precio de costo de cada producto.
+Al guardar una factura, el sistema toma ese costo y lo guarda como una foto dentro de la
+factura, así que cambiar el costo después no altera las facturas viejas.
 
-    ganancia = (lo cobrado sin IVA y ya con el descuento) − (costo de la mercancía vendida)
+Se muestran dos cifras, ambas solo para admin/jefa:
 
-Los gastos se muestran **aparte**, nunca se restan solos de esa ganancia.
+    ganancia bruta = (lo cobrado sin IVA y ya con el descuento) − (costo de la mercancía vendida)
+    ganancia neta  = ganancia bruta − gastos del período
+
+La **bruta** dice si se está vendiendo con buen margen; la **neta** es lo que realmente queda.
+
+## Subir inventario desde Excel
+
+En «Subir Excel» (admin/jefa) se cargan muchos productos de una vez a cualquier almacén.
+Acepta .xlsx, .xls y .csv, con los encabezados en la primera fila. Solo `nombre` es
+obligatorio; reconoce también nombres parecidos («producto», «costo», «cantidad», «stock»)
+y entiende precios escritos como `27.000` o `$ 27.000`. Antes de guardar muestra una vista
+previa con qué se crea y qué se actualiza, y permite elegir si las existencias del archivo
+**reemplazan** o se **suman** a las actuales. Hay una plantilla de ejemplo descargable.
+
+## Claves de usuario
+
+Las claves las escribe quien administra (mínimo 4 caracteres); el sistema no las genera al
+azar. Desde «Almacenes y usuarios» se crea un usuario con su clave y se le puede poner una
+clave nueva en cualquier momento.
+
+## Zona horaria
+
+Todo se calcula con la hora del negocio (`America/Bogota`, configurable con la variable
+`ZONA_HORARIA`), no con la del servidor. Esto importa: el servidor corre en UTC, así que sin
+esto una venta hecha a las 8 de la noche quedaría registrada al día siguiente y el cierre de
+caja de esa noche saldría vacío.
 
 ## Velocidad
 

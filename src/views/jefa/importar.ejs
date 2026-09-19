@@ -1,0 +1,122 @@
+<%- include('../partials/head', { titulo: 'Subir inventario desde Excel' }) %>
+<%- include('../partials/barra', { usuario, activo: 'importar' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <% if (!previo) { %>
+    <div class="panel">
+      <h2>Subir inventario desde Excel</h2>
+      <p class="ayuda">
+        Carga muchos productos de una vez. El archivo debe tener los encabezados en la primera fila.
+        Solo la columna <b>nombre</b> es obligatoria; lo demás se completa con ceros si falta.
+      </p>
+
+      <table class="tabla" style="margin-bottom:18px">
+        <thead><tr><th>Columna</th><th>Para qué sirve</th><th>Ejemplo</th></tr></thead>
+        <tbody>
+          <tr><td><b>nombre</b></td><td>Nombre del producto (obligatorio)</td><td>LAMINA PVC IMP</td></tr>
+          <tr><td>unidad</td><td>unidad, metro, kg…</td><td>unidad</td></tr>
+          <tr><td>precio_venta</td><td>Precio sugerido de venta</td><td>27000</td></tr>
+          <tr><td>precio_costo</td><td>Lo que te cuesta (solo lo ves tú y la jefa)</td><td>18000</td></tr>
+          <tr><td>existencias</td><td>Cantidad disponible</td><td>50</td></tr>
+          <tr><td>controla_stock</td><td>si / no — si se descuenta al vender</td><td>si</td></tr>
+        </tbody>
+      </table>
+      <p class="ayuda">
+        Acepta también nombres parecidos: «producto», «costo», «cantidad», «stock».
+        Los precios pueden venir como <b>27.000</b> o <b>$ 27.000</b>, los entiende igual.
+        <a href="/jefa/importar/plantilla">Descargar plantilla de ejemplo</a>.
+      </p>
+
+      <form method="post" action="/jefa/importar/revisar" enctype="multipart/form-data">
+        <div class="rejilla tres">
+          <label class="campo">Almacén al que se carga
+            <select name="almacen_id" required>
+              <% almacenes.forEach(a => { %>
+                <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>>
+                  <%= a.nombre %><%= a.region_nombre ? ' — ' + a.region_nombre : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="campo">Archivo (.xlsx, .xls o .csv)
+            <input type="file" name="archivo" accept=".xlsx,.xls,.csv" required>
+          </label>
+          <label class="campo">Si el producto ya existe
+            <select name="modo_existencias">
+              <option value="reemplazar">Reemplazar las existencias por las del archivo</option>
+              <option value="sumar">Sumar las del archivo a las actuales</option>
+            </select>
+          </label>
+        </div>
+        <div style="margin-top:16px"><button class="btn prim" type="submit">Revisar archivo</button></div>
+      </form>
+      <p class="ayuda" style="margin-top:12px">Nada se guarda todavía: primero te muestro qué va a pasar y tú confirmas.</p>
+    </div>
+
+  <% } else { %>
+    <div class="panel">
+      <h2>Revisa antes de guardar</h2>
+      <p class="ayuda">
+        Archivo <b><%= previo.nombreArchivo %></b> ·
+        <b><%= previo.nuevos %></b> producto(s) nuevo(s) ·
+        <b><%= previo.actualizados %></b> que ya existían y se actualizarían ·
+        existencias: <b><%= previo.modoExistencias === 'sumar' ? 'se suman' : 'se reemplazan' %></b>.
+      </p>
+
+      <% if (previo.errores.length > 0) { %>
+        <div class="aviso-caja">
+          <b>Avisos del archivo:</b>
+          <ul style="margin:8px 0 0 18px">
+            <% previo.errores.slice(0, 10).forEach(e => { %><li><%= e %></li><% }) %>
+          </ul>
+        </div>
+      <% } %>
+
+      <% if (!previo.columnas.precio_costo) { %>
+        <div class="aviso-caja">
+          El archivo no traía columna de <b>precio de costo</b>, así que esos productos quedan en costo 0 y la
+          ganancia saldría inflada. Puedes ponerlos después en la pestaña «Costos».
+        </div>
+      <% } %>
+
+      <table class="tabla">
+        <thead>
+          <tr><th>Producto</th><th>Unidad</th><th class="n">Precio venta</th><th class="n">Precio costo</th><th class="n">Existencias</th><th>Qué pasa</th></tr>
+        </thead>
+        <tbody>
+          <% previo.filas.slice(0, 200).forEach(f => { %>
+            <tr>
+              <td><%= f.nombre %></td>
+              <td><%= f.unidad %></td>
+              <td class="n"><%= fmt(f.precio_venta) %></td>
+              <td class="n"><%= Number(f.precio_costo) ? fmt(f.precio_costo) : '—' %></td>
+              <td class="n"><%= fmtCant(f.existencias) %></td>
+              <td>
+                <% if (f.accion === 'crear') { %>
+                  <span class="chip almacen">nuevo</span>
+                <% } else { %>
+                  actualiza (antes: <%= fmt(f.actual.precio_venta) %>, <%= fmtCant(f.actual.existencias) %> und.)
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% if (previo.filas.length > 200) { %>
+        <p class="ayuda" style="margin-top:10px">Se muestran los primeros 200 de <%= previo.filas.length %>. Se guardarán todos.</p>
+      <% } %>
+
+      <form method="post" action="/jefa/importar/aplicar" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+        <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+        <input type="hidden" name="modo_existencias" value="<%= previo.modoExistencias %>">
+        <input type="hidden" name="filas" value="<%= JSON.stringify(previo.filas.map(f => ({ nombre: f.nombre, unidad: f.unidad, precio_venta: f.precio_venta, precio_costo: f.precio_costo, existencias: f.existencias, controla_stock: f.controla_stock }))) %>">
+        <button class="btn cobrar" type="submit">Guardar <%= previo.filas.length %> producto(s)</button>
+        <a class="btn linea" href="/jefa/importar">Cancelar</a>
+      </form>
+    </div>
+  <% } %>
+</main>
+</body>
+</html>
