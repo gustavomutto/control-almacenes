@@ -74,6 +74,15 @@
         </div>
       <% } %>
 
+      <% if (previo.invertidas > 0) { %>
+        <div class="aviso-caja">
+          En <b><%= previo.invertidas %></b> de <%= previo.filas.length %> fila(s) el <b>costo es mayor que el precio
+          de venta</b>. Casi siempre eso quiere decir que en el archivo las dos columnas están cambiadas de lugar.
+          Si es así, marca la casilla de abajo y las enderezo al guardar —así no queda ninguna factura con ganancia
+          negativa. Si de verdad vendes esos productos por debajo del costo, déjala sin marcar.
+        </div>
+      <% } %>
+
       <% if (!previo.columnas.precio_costo) { %>
         <div class="aviso-caja">
           El archivo no traía columna de <b>precio de costo</b>, así que esos productos quedan en costo 0 y la
@@ -108,12 +117,21 @@
         <p class="ayuda" style="margin-top:10px">Se muestran los primeros 200 de <%= previo.filas.length %>. Se guardarán todos.</p>
       <% } %>
 
-      <form method="post" action="/jefa/importar/aplicar" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+      <form method="post" action="/jefa/importar/aplicar" style="margin-top:18px">
+        <% if (previo.invertidas > 0) { %>
+          <label class="campo" style="flex-direction:row;align-items:center;gap:8px;margin-bottom:14px">
+            <input type="checkbox" name="invertir" value="1"
+                   <%= previo.invertidas > previo.filas.length / 2 ? 'checked' : '' %>>
+            Intercambiar precio de venta y precio de costo al guardar
+          </label>
+        <% } %>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
         <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
         <input type="hidden" name="modo_existencias" value="<%= previo.modoExistencias %>">
         <input type="hidden" name="filas" value="<%= JSON.stringify(previo.filas.map(f => ({ nombre: f.nombre, unidad: f.unidad, precio_venta: f.precio_venta, precio_costo: f.precio_costo, existencias: f.existencias, controla_stock: f.controla_stock }))) %>">
         <button class="btn cobrar" type="submit">Guardar <%= previo.filas.length %> producto(s)</button>
         <a class="btn linea" href="/jefa/importar">Cancelar</a>
+        </div>
       </form>
     </div>
   <% } %>

@@ -17,6 +17,7 @@
       <a href="/jefa/gastos" class="<%= activo === 'gastos' ? 'activo' : '' %>">Gastos</a>
       <a href="/jefa/costos" class="<%= activo === 'costos' ? 'activo' : '' %>">Costos</a>
       <a href="/jefa/importar" class="<%= activo === 'importar' ? 'activo' : '' %>">Subir Excel</a>
+      <a href="/jefa/reparar" class="<%= activo === 'reparar' ? 'activo' : '' %>">Reparar</a>
       <% if (usuario.rol === 'admin') { %>
         <a href="/jefa/admin" class="<%= activo === 'admin' ? 'activo' : '' %>">Almacenes y usuarios</a>
       <% } %>

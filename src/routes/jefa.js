@@ -4,6 +4,7 @@ const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
 const { leerInventario, plantillaExcel } = require('../lib/importar');
+const { detectarInvertidos, repararInvertidos, repararCostos } = require('../lib/reparar');
 
 const router = express.Router();
 
@@ -257,22 +258,43 @@ router.get('/gastos', async (req, res) => {
 router.get('/costos', async (req, res) => {
   const almacenes = await pool.query(SQL_ALMACENES);
   const almacenFiltro = req.query.almacen || (almacenes.rows[0] ? String(almacenes.rows[0].id) : '');
+  const busqueda = String(req.query.q || '').trim();
+  const soloSinCosto = req.query.sin === '1';
 
-  const productos = almacenFiltro
-    ? await pool.query(
-        `SELECT p.*, (p.precio_venta - p.precio_costo) AS margen_unit
-         FROM productos p WHERE p.almacen_id = $1 AND p.activo = true ORDER BY p.nombre`,
-        [almacenFiltro]
-      )
-    : { rows: [] };
-
-  const sinCosto = productos.rows.filter((p) => Number(p.precio_costo) === 0).length;
+  // El resumen cuenta sobre TODO el almacén; la tabla muestra solo lo filtrado.
+  const [conteos, productos] = await Promise.all([
+    almacenFiltro
+      ? pool.query(
+          `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE precio_costo = 0)::int AS sin_costo,
+                  COUNT(*) FILTER (WHERE precio_costo > precio_venta AND precio_venta > 0)::int AS invertidos
+           FROM productos WHERE almacen_id = $1 AND activo = true`,
+          [almacenFiltro]
+        )
+      : { rows: [{ total: 0, sin_costo: 0, invertidos: 0 }] },
+    almacenFiltro
+      ? pool.query(
+          `SELECT p.*, (p.precio_venta - p.precio_costo) AS margen_unit
+           FROM productos p
+           WHERE p.almacen_id = $1 AND p.activo = true
+                 AND ($2 = '' OR p.nombre ILIKE '%' || $2 || '%')
+                 AND ($3::boolean = false OR p.precio_costo = 0)
+           ORDER BY p.nombre
+           LIMIT 400`,
+          [almacenFiltro, busqueda, soloSinCosto]
+        )
+      : { rows: [] },
+  ]);
 
   res.render('jefa/costos', {
     almacenes: almacenes.rows,
     almacenFiltro,
+    busqueda,
+    soloSinCosto,
     productos: productos.rows,
-    sinCosto,
+    sinCosto: conteos.rows[0].sin_costo,
+    invertidos: conteos.rows[0].invertidos,
+    totalProductos: conteos.rows[0].total,
     mensaje: req.query.ok || null,
     activo: 'costos',
   });
@@ -293,9 +315,99 @@ router.post('/costos', async (req, res) => {
       almacen_id,
     ]);
   }
-  res.redirect(
-    `/jefa/costos?almacen=${almacen_id}&ok=` + encodeURIComponent(`${entradas.length} precios de costo guardados.`)
+  const vuelta = new URLSearchParams({ almacen: String(almacen_id) });
+  if (req.body.q) vuelta.set('q', req.body.q);
+  if (req.body.sin === '1') vuelta.set('sin', '1');
+  vuelta.set(
+    'ok',
+    `${entradas.length} precio(s) de costo guardados. Si ya habías vendido esos productos, entra a «Reparar» para` +
+      ' actualizar la ganancia de esas facturas.'
   );
+  res.redirect('/jefa/costos?' + vuelta.toString());
+});
+
+// ======================= REPARAR (precios invertidos y ganancia vieja) =======================
+// Dos arreglos que no se pueden hacer desde las pantallas normales porque tocan facturas
+// ya emitidas: cambiar venta por costo cuando el Excel vino al revés, y volver a calcular
+// la ganancia de facturas hechas cuando el producto todavía no tenía costo.
+
+function datosReparar(req) {
+  return {
+    almacenId: req.body.almacen_id || req.query.almacen || null,
+    desde: (req.body.desde || req.query.desde || '').trim() || null,
+  };
+}
+
+async function pantallaReparar(req, res, extra = {}) {
+  const { almacenId, desde } = datosReparar(req);
+  const almacenes = await pool.query(SQL_ALMACENES);
+  const invertidos = await detectarInvertidos(pool, almacenId);
+
+  res.render('jefa/reparar', {
+    almacenes: almacenes.rows,
+    almacenFiltro: almacenId ? String(almacenId) : '',
+    desde: desde || '',
+    invertidos,
+    previo: null,
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+    activo: 'reparar',
+    ...extra,
+  });
+}
+
+router.get('/reparar', soloAdmin, (req, res) => pantallaReparar(req, res));
+
+router.post('/reparar/invertidos', soloAdmin, async (req, res) => {
+  const { almacenId, desde } = datosReparar(req);
+  const aplicar = req.body.aplicar === '1';
+
+  const ids = req.body.ids
+    ? String(req.body.ids).split(',')
+    : Object.keys(req.body)
+        .filter((k) => k.startsWith('prod_'))
+        .map((k) => k.slice(5));
+
+  try {
+    const previo = await repararInvertidos(pool, { almacenId, ids, desde, aplicar });
+    if (aplicar) {
+      return res.redirect(
+        '/jefa/reparar?' +
+          new URLSearchParams({
+            almacen: almacenId || '',
+            ok:
+              `Listo: ${previo.cambiados} producto(s) corregidos, ${previo.lineas} línea(s) de factura y ` +
+              `${previo.documentos} factura(s) recalculadas.`,
+          }).toString()
+      );
+    }
+    await pantallaReparar(req, res, { previo: { ...previo, tipo: 'invertidos', ids: ids.join(',') } });
+  } catch (err) {
+    console.error('Error reparando precios invertidos:', err);
+    res.redirect('/jefa/reparar?error=' + encodeURIComponent(err.message));
+  }
+});
+
+router.post('/reparar/costos', soloAdmin, async (req, res) => {
+  const { almacenId, desde } = datosReparar(req);
+  const aplicar = req.body.aplicar === '1';
+
+  try {
+    const previo = await repararCostos(pool, { almacenId, desde, aplicar });
+    if (aplicar) {
+      return res.redirect(
+        '/jefa/reparar?' +
+          new URLSearchParams({
+            almacen: almacenId || '',
+            ok: `Listo: ${previo.lineas} línea(s) y ${previo.documentos} factura(s) recalculadas con los costos de hoy.`,
+          }).toString()
+      );
+    }
+    await pantallaReparar(req, res, { previo: { ...previo, tipo: 'costos', ids: '' } });
+  } catch (err) {
+    console.error('Error recalculando facturas:', err);
+    res.redirect('/jefa/reparar?error=' + encodeURIComponent(err.message));
+  }
 });
 
 // ======================= IMPORTAR INVENTARIO DESDE EXCEL =======================
@@ -365,6 +477,10 @@ router.post('/importar/revisar', subida.single('archivo'), async (req, res) => {
       nombreArchivo: req.file.originalname,
       nuevos: filas.filter((f) => f.accion === 'crear').length,
       actualizados: filas.filter((f) => f.accion === 'actualizar').length,
+      // Aviso temprano: si en casi todas las filas el "costo" es mayor que la "venta",
+      // lo más probable es que las dos columnas del archivo estén cambiadas.
+      invertidas: filas.filter((f) => Number(f.precio_costo) > Number(f.precio_venta) && Number(f.precio_venta) > 0)
+        .length,
     },
     mensaje: null,
     error: null,
@@ -376,6 +492,7 @@ router.post('/importar/revisar', subida.single('archivo'), async (req, res) => {
 router.post('/importar/aplicar', async (req, res) => {
   const almacenId = req.body.almacen_id;
   const modo = req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar';
+  const invertir = req.body.invertir === '1';
 
   let filas;
   try {
@@ -397,6 +514,9 @@ router.post('/importar/aplicar', async (req, res) => {
       if (!nombre) continue;
 
       const existencias = Number(f.existencias) || 0;
+      // Si el archivo traía las columnas cambiadas, se enderezan aquí, antes de guardar.
+      const venta = Number(invertir ? f.precio_costo : f.precio_venta) || 0;
+      const costo = Number(invertir ? f.precio_venta : f.precio_costo) || 0;
       const { rows } = await client.query(
         `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, precio_costo, existencias, controla_stock)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -414,8 +534,8 @@ router.post('/importar/aplicar', async (req, res) => {
           almacenId,
           nombre,
           String(f.unidad || 'unidad').slice(0, 30),
-          Number(f.precio_venta) || 0,
-          Number(f.precio_costo) || 0,
+          venta,
+          costo,
           existencias,
           f.controla_stock !== false,
           modo,

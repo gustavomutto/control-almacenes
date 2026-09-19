@@ -9,7 +9,7 @@
         <h2 style="margin-bottom:2px">Precios de costo</h2>
         <p class="ayuda" style="margin:0">Solo tú y la jefa ven esta pantalla. El personal del almacén no ve los costos ni la ganancia.</p>
       </div>
-      <form method="get" action="/jefa/costos" style="margin-left:auto">
+      <form method="get" action="/jefa/costos" style="margin-left:auto;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <label class="campo">Almacén
           <select name="almacen" onchange="this.form.submit()">
             <% almacenes.forEach(a => { %>
@@ -19,18 +19,38 @@
             <% }) %>
           </select>
         </label>
+        <label class="campo">Buscar producto
+          <input class="in" type="search" name="q" value="<%= busqueda %>" placeholder="lámina, tornillo…">
+        </label>
+        <label class="campo" style="flex-direction:row;align-items:center;gap:6px">
+          <input type="checkbox" name="sin" value="1" <%= soloSinCosto ? 'checked' : '' %> onchange="this.form.submit()">
+          Solo los que no tienen costo
+        </label>
+        <button class="btn linea" type="submit">Buscar</button>
       </form>
     </div>
 
     <% if (sinCosto > 0) { %>
       <div class="aviso-caja">
-        Hay <b><%= sinCosto %></b> producto(s) sin precio de costo. Mientras no lo tengan, la ganancia de esos
-        productos se calcula como si el material fuera gratis, así que el balance queda inflado.
+        Hay <b><%= sinCosto %></b> producto(s) sin precio de costo de <%= totalProductos %> en este almacén.
+        Mientras no lo tengan, la ganancia de esos productos se calcula como si el material fuera gratis, así que
+        el balance queda inflado. Si ya los vendiste, después de ponerles el costo pasa por
+        <a href="/jefa/reparar?almacen=<%= almacenFiltro %>">Reparar</a> para actualizar esas facturas.
+      </div>
+    <% } %>
+
+    <% if (invertidos > 0) { %>
+      <div class="aviso-caja">
+        <b>Ojo:</b> <%= invertidos %> producto(s) de este almacén tienen el costo <b>por encima</b> del precio de
+        venta. Normalmente eso significa que el Excel traía las dos columnas al revés y la ganancia va a salir
+        negativa. Se arregla en un paso desde <a href="/jefa/reparar?almacen=<%= almacenFiltro %>">Reparar</a>.
       </div>
     <% } %>
 
     <form method="post" action="/jefa/costos">
       <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+      <input type="hidden" name="q" value="<%= busqueda %>">
+      <input type="hidden" name="sin" value="<%= soloSinCosto ? '1' : '' %>">
       <table class="tabla">
         <thead>
           <tr>
@@ -56,10 +76,18 @@
             </tr>
           <% }) %>
           <% if (productos.length === 0) { %>
-            <tr><td colspan="6" class="vacio">Este almacén todavía no tiene productos cargados.</td></tr>
+            <tr><td colspan="6" class="vacio">
+              <%= busqueda || soloSinCosto ? 'Ningún producto coincide con la búsqueda.' : 'Este almacén todavía no tiene productos cargados.' %>
+            </td></tr>
           <% } %>
         </tbody>
       </table>
+      <% if (productos.length === 400) { %>
+        <p class="ayuda" style="margin-top:10px">
+          Se muestran 400 productos a la vez. Usa el buscador para llegar a los que faltan; lo que guardes aquí no
+          afecta a los que no salen en pantalla.
+        </p>
+      <% } %>
       <% if (productos.length > 0) { %>
         <div style="margin-top:16px"><button class="btn prim" type="submit">Guardar precios de costo</button></div>
       <% } %>

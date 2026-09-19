@@ -1,0 +1,166 @@
+<%- include('../partials/head', { titulo: 'Reparar precios y ganancia' }) %>
+<%- include('../partials/barra', { usuario, activo: 'reparar' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <% if (previo) { %>
+    <%
+      const dif = previo.despues.margen - previo.antes.margen;
+      const accion = previo.tipo === 'invertidos' ? '/jefa/reparar/invertidos' : '/jefa/reparar/costos';
+    %>
+    <div class="panel">
+      <h2>Así quedaría (todavía no he guardado nada)</h2>
+      <p class="ayuda">
+        Esto no es un estimado: hice el cambio de verdad en la base de datos, medí el resultado y lo deshice.
+        Si le das «Aplicar», queda exactamente así.
+      </p>
+
+      <table class="tabla" style="margin-top:14px">
+        <thead><tr><th></th><th class="n">Ahora</th><th class="n">Después</th></tr></thead>
+        <tbody>
+          <tr><td>Facturas incluidas</td><td class="n"><%= previo.antes.facturas %></td><td class="n"><%= previo.despues.facturas %></td></tr>
+          <tr><td>Vendido</td><td class="n"><%= fmt(previo.antes.venta) %></td><td class="n"><%= fmt(previo.despues.venta) %></td></tr>
+          <tr><td>Costo de la mercancía</td><td class="n"><%= fmt(previo.antes.costo) %></td><td class="n"><%= fmt(previo.despues.costo) %></td></tr>
+          <tr><td><b>Ganancia bruta</b></td>
+              <td class="n"><b><%= fmt(previo.antes.margen) %></b></td>
+              <td class="n"><b><%= fmt(previo.despues.margen) %></b></td></tr>
+          <tr><td>Facturas con ganancia negativa</td>
+              <td class="n"><%= previo.antes.negativas %></td>
+              <td class="n"><%= previo.despues.negativas %></td></tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top:14px">
+        <b><%= previo.cambiados %></b> producto(s) corregidos ·
+        <b><%= previo.lineas %></b> línea(s) de factura ·
+        <b><%= previo.documentos %></b> factura(s) ·
+        la ganancia bruta <%= dif >= 0 ? 'sube' : 'baja' %> <b><%= fmt(Math.abs(dif)) %></b>.
+      </p>
+
+      <% if (previo.productos && previo.productos.length > 0) { %>
+        <table class="tabla" style="margin-top:14px">
+          <thead><tr><th>Producto</th><th class="n">Queda con precio de venta</th><th class="n">Queda con costo</th></tr></thead>
+          <tbody>
+            <% previo.productos.slice(0, 200).forEach(p => { %>
+              <tr>
+                <td><%= p.nombre %></td>
+                <td class="n"><%= fmt(p.precio_venta) %></td>
+                <td class="n"><%= fmt(p.precio_costo) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+
+      <form method="post" action="<%= accion %>" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+        <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+        <input type="hidden" name="desde" value="<%= desde %>">
+        <input type="hidden" name="ids" value="<%= previo.ids %>">
+        <input type="hidden" name="aplicar" value="1">
+        <button class="btn cobrar" type="submit">Aplicar el cambio</button>
+        <a class="btn linea" href="/jefa/reparar?almacen=<%= almacenFiltro %>">Cancelar</a>
+      </form>
+    </div>
+
+  <% } else { %>
+
+    <div class="panel">
+      <div class="fila-filtro">
+        <div>
+          <h2 style="margin-bottom:2px">Reparar precios y ganancia</h2>
+          <p class="ayuda" style="margin:0">
+            Cada factura guarda el costo del momento en que se hizo, así que cambiar el catálogo hoy no toca
+            las facturas viejas. Estas dos herramientas sí las tocan, y por eso están aparte.
+          </p>
+        </div>
+        <form method="get" action="/jefa/reparar" style="margin-left:auto;display:flex;gap:10px;align-items:flex-end">
+          <label class="campo">Almacén
+            <select name="almacen" onchange="this.form.submit()">
+              <option value="">Todos</option>
+              <% almacenes.forEach(a => { %>
+                <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>>
+                  <%= a.nombre %><%= a.region_nombre ? ' — ' + a.region_nombre : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="campo">Facturas desde
+            <input class="in" type="date" name="desde" value="<%= desde %>">
+          </label>
+          <button class="btn linea" type="submit">Ver</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>1. Precios de venta y costo invertidos</h3>
+      <p class="ayuda" style="max-width:85ch">
+        Estos productos tienen el costo <b>por encima</b> del precio de venta: es lo que pasa cuando el Excel
+        traía las dos columnas al revés. Al aplicarlo intercambio los dos valores y vuelvo a calcular las
+        facturas donde se vendieron, para que la ganancia deje de salir negativa. Revisa la lista y desmarca
+        cualquier producto que de verdad vendas por debajo del costo.
+      </p>
+
+      <% if (invertidos.length === 0) { %>
+        <p class="vacio" style="margin-top:14px">
+          No hay productos con el costo por encima del precio de venta<%= almacenFiltro ? ' en este almacén' : '' %>.
+        </p>
+      <% } else { %>
+        <form method="post" action="/jefa/reparar/invertidos">
+          <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+          <input type="hidden" name="desde" value="<%= desde %>">
+          <table class="tabla" style="margin-top:14px">
+            <thead>
+              <tr>
+                <th style="width:36px"><input type="checkbox" checked onclick="document.querySelectorAll('.chk').forEach(c => c.checked = this.checked)"></th>
+                <th>Producto</th><th>Almacén</th>
+                <th class="n">Dice venta</th><th class="n">Dice costo</th>
+                <th class="n">Quedaría: venta</th><th class="n">Quedaría: costo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% invertidos.forEach(p => { %>
+                <tr>
+                  <td><input class="chk" type="checkbox" name="prod_<%= p.id %>" checked></td>
+                  <td><%= p.nombre %></td>
+                  <td><%= p.almacen_nombre %></td>
+                  <td class="n"><%= fmt(p.precio_venta) %></td>
+                  <td class="n"><%= fmt(p.precio_costo) %></td>
+                  <td class="n"><b><%= fmt(p.precio_costo) %></b></td>
+                  <td class="n"><b><%= fmt(p.precio_venta) %></b></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          <div style="margin-top:16px">
+            <button class="btn prim" type="submit">Ver qué pasaría</button>
+          </div>
+          <p class="ayuda" style="margin-top:10px">Nada se guarda todavía: primero te muestro el resultado y tú confirmas.</p>
+        </form>
+      <% } %>
+    </div>
+
+    <div class="panel">
+      <h3>2. Ganancia de facturas hechas antes de poner el costo</h3>
+      <p class="ayuda" style="max-width:85ch">
+        Si cargaste productos sin precio de costo y se vendieron así, esas facturas quedaron calculadas como si
+        el material fuera gratis. Aquí vuelvo a tomar el precio de costo que hay <b>hoy</b> en «Costos» y recalculo
+        las facturas del almacén y del rango que elijas arriba.
+      </p>
+      <div class="aviso-caja">
+        Ojo: esto reescribe el costo guardado en las facturas. Si a lo largo del tiempo el costo de un producto
+        cambió de verdad (subió el proveedor, por ejemplo), usa la casilla «Facturas desde» para recalcular solo
+        el periodo que quieres arreglar y no borrar la historia buena.
+      </div>
+      <form method="post" action="/jefa/reparar/costos" style="margin-top:16px">
+        <input type="hidden" name="almacen_id" value="<%= almacenFiltro %>">
+        <input type="hidden" name="desde" value="<%= desde %>">
+        <button class="btn prim" type="submit">Ver qué pasaría</button>
+      </form>
+    </div>
+
+  <% } %>
+</main>
+</body>
+</html>

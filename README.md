@@ -73,6 +73,28 @@ Se muestran dos cifras, ambas solo para admin/jefa:
 
 La **bruta** dice si se está vendiendo con buen margen; la **neta** es lo que realmente queda.
 
+## Reparar (precios invertidos y ganancia vieja)
+
+Como el costo queda congelado dentro de cada factura, cambiar el catálogo hoy no arregla lo ya
+vendido. La pestaña «Reparar» (admin/jefa) sí toca las facturas y resuelve los dos casos que se
+presentan en la práctica:
+
+1. **Precios invertidos**: lista los productos cuyo costo quedó por encima del precio de venta
+   —la señal de que el Excel traía las dos columnas cambiadas—, intercambia los dos valores en los
+   que se marquen y vuelve a calcular las facturas donde se vendieron.
+2. **Ganancia de facturas hechas antes de poner el costo**: vuelve a tomar el precio de costo que
+   hay hoy en «Costos» y recalcula, con filtro opcional de almacén y de fecha «desde».
+
+Lo que se cobró no se toca nunca: el total de cada factura sigue siendo el que pagó el cliente.
+Solo cambian el costo y la ganancia, que son cifras internas.
+
+La vista previa no es una estimación: el cambio se ejecuta de verdad dentro de una transacción, se
+mide el resultado y se deshace con `ROLLBACK`. Lo que muestra la pantalla es exactamente lo que
+queda al confirmar.
+
+Para que no vuelva a pasar, al revisar un Excel el sistema avisa si el costo viene por encima de la
+venta y ofrece una casilla para enderezar las dos columnas antes de guardar.
+
 ## Subir inventario desde Excel
 
 En «Subir Excel» (admin/jefa) se cargan muchos productos de una vez a cualquier almacén.
@@ -122,6 +144,7 @@ src/
   server.js                       servidor (Express)
   lib/calculos.js                  totales, IVA y fórmulas de m²
   lib/impresion.js                 reglas de papel (carta / 80mm / 58mm)
+  lib/reparar.js                   arreglo de precios invertidos y recálculo de facturas
   db/schema.sql                    estructura de la base de datos (Postgres)
   db/migrate.js                     crea/actualiza las tablas
   db/actualizar_valledupar.js       puesta a punto de los 4 almacenes (segura de repetir)
