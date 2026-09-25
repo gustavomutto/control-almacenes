@@ -35,12 +35,15 @@ const PAPELES = {
   // simplemente se arma dentro de ese papel. Cuando la página imponía el tamaño con
   // @page size, la Ricoh comparaba ese tamaño con el de la bandeja y rechazaba el trabajo;
   // los equipos de oficina son estrictos con eso, a diferencia de una impresora sencilla.
+  // `size: landscape` no dice cuánto mide la hoja, solo que el lado largo va horizontal.
+  // Es lo que hace falta en media carta (8,5 de ancho x 6,5 de alto): sin eso, la impresora
+  // la trataba como hoja parada y escribía a lo largo del lado angosto.
   media:
-    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
+    `@page{size:landscape;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:11px}',
-  // Igual, pero el bloque mide 13 cm y lleva la línea de corte para la hoja carta completa.
+  // La hoja carta completa sí va parada: la factura ocupa la parte de arriba y se corta.
   carta:
-    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
+    `@page{size:portrait;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
     'border-bottom:1px dashed #999}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
@@ -88,7 +91,7 @@ function papelEfectivo(usuario, almacen) {
 }
 
 const NOMBRES_PAPEL = {
-  media: 'media carta (el tamaño lo pone la impresora)',
+  media: 'media carta acostada (8,5 de ancho)',
   carta: 'hoja carta (se corta a la mitad)',
   '80mm': 'ticket 80mm',
   '58mm': 'ticket 58mm',
