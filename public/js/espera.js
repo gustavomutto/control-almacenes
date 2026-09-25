@@ -1,13 +1,14 @@
-/* Ventas y cotizaciones «en espera».
+/* Varias facturas abiertas a la vez.
  *
- * Resuelve dos formas de perder el trabajo:
- *   1. El cliente no se decide y llega otro: se guarda la venta a medio hacer en el servidor
- *      y la caja queda libre. Cualquier caja del mismo almacén puede retomarla.
- *   2. Se recarga la página, se va la luz o se cierra el navegador sin querer: lo que estaba
- *      en pantalla se recupera solo, porque se va guardando en el mismo equipo.
+ * El mostrador real: un cliente no se decide y entra otro que sí. Con «Nueva factura» la que
+ * está en pantalla pasa sola a espera —sin preguntar nada— y queda una hoja en blanco para el
+ * siguiente. Arriba quedan las dos como pestañas y se salta de una a otra con un clic.
  *
- * Nada de esto es una factura: no hay número, no se descuenta inventario y no entra a
- * ningún reporte hasta que se cobra.
+ * Además, lo que está en pantalla se va guardando en el mismo equipo: recargar la página,
+ * cambiar de pestaña o que se cierre el navegador no borra la venta.
+ *
+ * Nada de esto es una factura todavía: no hay número, no se descuenta inventario y no entra a
+ * caja ni a los reportes hasta que se cobra.
  */
 window.Espera = (function () {
   const nf = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 });
@@ -19,15 +20,18 @@ window.Espera = (function () {
     const caja = document.querySelector(cfg.contenedor);
     if (!caja) return { autoguardar() {}, alCobrar() {} };
 
+    const esVenta = cfg.tipo === 'factura';
+    const PALABRA = esVenta ? 'factura' : 'cotización';
     const clave = `espera:${cfg.tipo}:${cfg.almacenId}`;
+
     let lista = [];
     let temporizador = null;
-    // Cuando la venta ya se cobró, no hay que volver a guardarla: si no, al salir de la
-    // página el guardado automático la revivía y aparecía otra vez como pendiente.
-    let cerrado = false;
     let avisoTexto = '';
+    // Cuando ya se cobró no hay que volver a guardar: si no, al salir de la página el
+    // guardado automático revivía una factura que ya estaba emitida.
+    let cerrado = false;
 
-    // ---------- Borrador local (este equipo) ----------
+    // ---------- Lo que está en pantalla (se guarda en este equipo) ----------
     function guardarLocal() {
       if (cerrado) return;
       try {
@@ -35,11 +39,12 @@ window.Espera = (function () {
         if (!estado || !estado.lineas) localStorage.removeItem(clave);
         else localStorage.setItem(clave, JSON.stringify({ datos: estado.datos, guardado: Date.now() }));
       } catch (err) {
-        /* modo privado o almacenamiento lleno: no es motivo para romper la venta */
+        /* navegación privada o almacenamiento lleno: no es motivo para romper la venta */
       }
     }
 
     function autoguardar() {
+      pintarActual();
       clearTimeout(temporizador);
       temporizador = setTimeout(guardarLocal, 400);
     }
@@ -61,14 +66,11 @@ window.Espera = (function () {
       if (!guardado || !guardado.datos) return;
       cfg.cargar(guardado.datos);
       const estado = cfg.estado();
-      if (estado && estado.lineas) {
-        avisar(`Se recuperó ${cfg.tipo === 'factura' ? 'la venta' : 'la cotización'} que estabas haciendo.`);
-      } else {
-        limpiarLocal();
-      }
+      if (estado && estado.lineas) avisar(`Se recuperó la ${PALABRA} que estabas haciendo.`);
+      else limpiarLocal();
     }
 
-    // ---------- Lista en espera (servidor) ----------
+    // ---------- Las que están en espera (viven en el servidor) ----------
     async function pedir(url, opciones) {
       const r = await fetch(url, opciones);
       const datos = await r.json();
@@ -86,16 +88,28 @@ window.Espera = (function () {
       }
     }
 
+    // El nombre sale solo: el del cliente si ya lo escribieron, y si no la hora.
+    function nombreAutomatico(estado) {
+      const hora = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      return (estado && estado.nombre) || `${esVenta ? 'Venta' : 'Cotización'} ${hora}`;
+    }
+
+    function etiquetaActual() {
+      const estado = cfg.estado();
+      if (!estado || !estado.lineas) return `${esVenta ? 'Venta' : 'Cotización'} nueva`;
+      return `${estado.nombre || 'Sin nombre'} · ${pesos(estado.total)}`;
+    }
+
     function pintar() {
-      const etiqueta = cfg.tipo === 'factura' ? 'venta' : 'cotización';
       caja.innerHTML = `
         <div class="espera-barra">
-          <button class="btn linea mini" type="button" data-guardar>Dejar esta ${etiqueta} en espera</button>
-          <span class="espera-titulo">${lista.length ? 'En espera:' : ''}</span>
+          <button class="btn linea mini" type="button" data-nueva>+ Nueva ${PALABRA}</button>
+          <span class="espera-titulo">abiertas</span>
           <div class="espera-lista">
+            <span class="espera-chip actual"><b data-actual>${esc(etiquetaActual())}</b></span>
             ${lista
               .map(
-                (b) => `<span class="espera-chip" title="${esc(b.vendedor || '')}">
+                (b) => `<span class="espera-chip" title="Abierta por ${esc(b.vendedor || '')}">
                     <button type="button" data-abrir="${b.id}">${esc(b.nombre)} · ${pesos(b.total)}</button>
                     <button type="button" class="espera-x" data-borrar="${b.id}" title="Borrar">×</button>
                   </span>`
@@ -106,8 +120,13 @@ window.Espera = (function () {
         </div>`;
     }
 
-    // El aviso se guarda en una variable porque la barra se vuelve a dibujar cuando
-    // cambia la lista, y si no se perdería el mensaje que acaba de aparecer.
+    // Solo el texto de la pestaña abierta, para no redibujar la barra con cada tecla.
+    function pintarActual() {
+      const act = caja.querySelector('[data-actual]');
+      if (act) act.textContent = etiquetaActual();
+    }
+
+    // El aviso se guarda aparte porque la barra se redibuja al cambiar la lista.
     function avisar(texto) {
       avisoTexto = texto;
       const aviso = caja.querySelector('.espera-aviso');
@@ -120,52 +139,59 @@ window.Espera = (function () {
       }, 6000);
     }
 
-    // Guarda lo que hay en pantalla y deja la caja libre.
-    async function guardarEnEspera({ silencioso = false } = {}) {
+    // Guarda lo que hay en pantalla y deja la caja libre. No pregunta nada.
+    async function guardarEnEspera() {
       const estado = cfg.estado();
-      if (!estado || !estado.lineas) {
-        if (!silencioso) alert('No hay nada que dejar en espera.');
-        return false;
-      }
-      let nombre = estado.nombre;
-      if (!silencioso || !nombre) {
-        const sugerido = nombre || '';
-        const escrito = prompt('¿A nombre de quién queda en espera?', sugerido);
-        if (escrito === null) return false;
-        nombre = escrito.trim() || sugerido || 'Sin nombre';
-      }
+      if (!estado || !estado.lineas) return true; // no hay nada que guardar
 
+      const nombre = nombreAutomatico(estado);
       try {
         await pedir('/almacen/borradores', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tipo: cfg.tipo, nombre, datos: estado.datos, total: estado.total, lineas: estado.lineas }),
+          body: JSON.stringify({
+            tipo: cfg.tipo,
+            nombre,
+            datos: estado.datos,
+            total: estado.total,
+            lineas: estado.lineas,
+          }),
         });
       } catch (err) {
-        alert('No se pudo guardar en espera: ' + err.message);
+        alert('No se pudo dejar en espera: ' + err.message);
         return false;
       }
 
       cfg.limpiar();
       limpiarLocal();
+      return nombre;
+    }
+
+    async function nueva() {
+      const estado = cfg.estado();
+      if (!estado || !estado.lineas) {
+        avisar(`Ya estás en una ${PALABRA} nueva.`);
+        if (cfg.foco) cfg.foco();
+        return;
+      }
+      const nombre = await guardarEnEspera();
+      if (nombre === false) return;
       await refrescar();
-      avisar(`Guardada en espera a nombre de ${nombre}.`);
-      return true;
+      avisar(`La ${PALABRA} de ${nombre} quedó en espera. Puedes atender al siguiente cliente.`);
+      if (cfg.foco) cfg.foco();
     }
 
     async function abrir(id) {
       const actual = cfg.estado();
-      // Nunca se pierde lo que hay en pantalla: primero se deja en espera.
-      if (actual && actual.lineas) {
-        const ok = await guardarEnEspera({ silencioso: true });
-        if (!ok) return;
-      }
+      // Lo que está en pantalla nunca se pierde: primero se deja en espera.
+      if (actual && actual.lineas && (await guardarEnEspera()) === false) return;
+
       try {
         const datos = await pedir(`/almacen/borradores/${id}/abrir`, { method: 'POST' });
         cfg.cargar(datos.borrador.datos);
         guardarLocal();
         await refrescar();
-        avisar(`Retomaste la ${cfg.tipo === 'factura' ? 'venta' : 'cotización'} de ${datos.borrador.nombre}.`);
+        avisar(`Retomaste la ${PALABRA} de ${datos.borrador.nombre}.`);
       } catch (err) {
         alert(err.message);
         refrescar();
@@ -174,7 +200,7 @@ window.Espera = (function () {
 
     async function borrar(id) {
       const fila = lista.find((b) => String(b.id) === String(id));
-      if (!confirm(`¿Borrar la que está en espera de "${fila ? fila.nombre : ''}"? No se puede deshacer.`)) return;
+      if (!confirm(`¿Borrar la ${PALABRA} en espera de "${fila ? fila.nombre : ''}"? No se puede deshacer.`)) return;
       try {
         await pedir(`/almacen/borradores/${id}/eliminar`, { method: 'POST' });
       } catch (err) {
@@ -186,7 +212,7 @@ window.Espera = (function () {
     caja.addEventListener('click', (e) => {
       const b = e.target.closest('button');
       if (!b) return;
-      if (b.hasAttribute('data-guardar')) guardarEnEspera();
+      if (b.hasAttribute('data-nueva')) nueva();
       else if (b.dataset.abrir) abrir(b.dataset.abrir);
       else if (b.dataset.borrar) borrar(b.dataset.borrar);
     });
@@ -194,16 +220,16 @@ window.Espera = (function () {
     // Al cerrar la pestaña se guarda de una vez, sin esperar al temporizador.
     window.addEventListener('beforeunload', guardarLocal);
 
-    pintar();
-    recuperarLocal();
-    refrescar();
-
     function alCobrar() {
       cerrado = true;
       limpiarLocal();
     }
 
-    return { autoguardar, alCobrar, refrescar };
+    pintar();
+    recuperarLocal();
+    refrescar();
+
+    return { autoguardar, alCobrar, refrescar, nueva };
   }
 
   return { init };

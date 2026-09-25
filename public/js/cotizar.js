@@ -363,6 +363,7 @@
       estado: estadoActual,
       cargar: cargarEstado,
       limpiar: limpiarCotizacion,
+      foco: () => $('#cM2').focus(),
     });
   }
 

@@ -492,6 +492,11 @@
       e.preventDefault();
       $('#btnNueva').click();
     }
+    // F2: deja la venta actual en espera y abre una factura nueva.
+    if (e.key === 'F2') {
+      e.preventDefault();
+      if (espera.nueva) espera.nueva();
+    }
   });
 
   $('#fCliente').addEventListener('input', () => espera.autoguardar());
@@ -504,6 +509,7 @@
       estado: estadoActual,
       cargar: cargarEstado,
       limpiar: limpiarVenta,
+      foco: () => buscar.focus(),
     });
   }
 

@@ -36,23 +36,28 @@ administración y la ganancia se calcula solo para ellos.
 - **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
   impresos.
 
-## Ventas en espera
+## Varias facturas abiertas a la vez
 
-Un cliente que no se decide no puede bloquear la caja. Con **«Dejar esta venta en espera»** lo que
-va en pantalla se guarda a nombre del cliente y la caja queda libre para atender al siguiente; la
-venta guardada aparece como una etiqueta arriba y se retoma con un clic, exactamente donde iba.
-Funciona igual en «Cotizar», con su propia lista.
+Dos clientes al tiempo: uno no se decide y el otro sí. Con **«+ Nueva factura»** lo que está en
+pantalla pasa solo a espera —sin preguntar nada— y queda una hoja en blanco para atender al
+siguiente. Arriba quedan las dos como pestañas: la negra es la que está abierta y las grises las
+que esperan; se salta de una a otra con un clic. La tecla **F2** hace lo mismo que el botón.
+En «Cotizar» funciona igual, con su propia lista.
+
+Cada pestaña se nombra sola: con el nombre del cliente si ya lo escribieron, y si no con la hora
+(«Venta 10:16 a. m.»), y muestra el total en vivo.
 
 Tres detalles que importan en el mostrador:
 
-- Si hay una venta abierta y se retoma otra, la abierta se guarda sola: nunca se pierde nada.
+- Si hay una factura abierta y se retoma otra, la abierta se guarda sola: no hay forma de perder
+  trabajo. El botón **«Vaciar»**, abajo, es el único que descarta, y pide confirmación.
 - Si se recarga la página, se cierra el navegador sin querer o se va la luz, al volver a entrar la
-  venta que estaba en pantalla se recupera sola (se va guardando en el mismo equipo). Las que están
-  «en espera» viven en el servidor, así que también se pueden retomar desde otra caja del mismo
+  factura que estaba en pantalla se recupera sola (se va guardando en el mismo equipo). Las que
+  están en espera viven en el servidor, así que también se pueden retomar desde otra caja del mismo
   almacén o desde otro dispositivo.
-- Una venta en espera **no es una factura**: no tiene número, no descuenta inventario y no aparece
-  en caja ni en los reportes. La mercancía sigue disponible para quien la compre primero; el
-  inventario solo se mueve al cobrar.
+- Una factura en espera **no es una factura todavía**: no tiene número, no descuenta inventario y no
+  aparece en caja ni en los reportes. La mercancía sigue disponible para quien la compre primero;
+  el inventario solo se mueve al cobrar.
 
 Cada almacén puede tener hasta 30 en espera de cada tipo, y las que pasan de un mes se borran solas.
 
@@ -242,7 +247,7 @@ public/css/estilo.css               estilos
 public/css/ticket.css               formato del ticket/factura impresa
 public/js/pos.js                    pantalla de venta
 public/js/cotizar.js                pantalla de cotización
-public/js/espera.js                 ventas y cotizaciones a medio hacer
+public/js/espera.js                 varias facturas abiertas a la vez
 ```
 
 ## Desplegar en Railway
