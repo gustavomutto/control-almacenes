@@ -20,6 +20,36 @@
   </div>
 
   <div class="panel">
+    <h3>Cargar el inventario desde Excel</h3>
+    <p class="ayuda">
+      Para no escribir producto por producto: descarga el archivo con tu inventario tal como está hoy
+      (nombre, unidad, precio de venta y existencias), llénalo en Excel y súbelo aquí. Los productos que
+      no existan se crean y los que ya estén se actualizan.
+    </p>
+    <form method="post" action="/almacen/productos/importar" enctype="multipart/form-data">
+      <div class="rejilla tres">
+        <label class="campo">Archivo lleno (.xlsx, .xls o .csv)
+          <input type="file" name="archivo" accept=".xlsx,.xls,.csv" required>
+        </label>
+        <label class="campo">Las existencias del archivo
+          <select name="modo_existencias">
+            <option value="reemplazar">Reemplazan las actuales</option>
+            <option value="sumar">Se suman a las actuales</option>
+          </select>
+        </label>
+        <div class="campo" style="justify-content:flex-end">
+          <a class="btn linea" href="/almacen/productos/excel">Descargar mi inventario en Excel</a>
+        </div>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Revisar archivo</button></div>
+    </form>
+    <p class="ayuda" style="margin-top:12px">
+      Nada se guarda todavía: primero te muestro qué va a pasar y tú confirmas. No borres ni cambies los
+      encabezados de la primera fila.
+    </p>
+  </div>
+
+  <div class="panel">
     <h3>Catálogo (<%= productos.filter(p => p.activo).length %> productos)</h3>
     <table class="tabla">
       <thead>

@@ -251,6 +251,12 @@
       }
     }
 
+    // En hoja carta la vista previa es la factura normal, no la tirilla.
+    if (a.papel === 'carta') {
+      $('#previewFactura').innerHTML = previewCarta(t, a, hora, fecha, cambio);
+      return;
+    }
+
     $('#previewFactura').innerHTML = `<div class="tk">
       <div class="c">${esc(a.encabezado || a.nombre)}</div>
       <div class="c">${esc(a.direccion)}</div>
@@ -272,6 +278,76 @@
       <div class="c tk-pie">¡Gracias por su compra!</div>
       <div class="c">Le atendió: ${esc(A.vendedor)}</div>
       ${a.nota ? `<div class="c tk-nota">${esc(a.nota)}</div>` : ''}
+    </div>`;
+  }
+
+  // Vista previa de la factura en hoja carta (la misma que sale impresa).
+  function previewCarta(t, a, hora, fecha, cambio) {
+    const esFactura = A.tipo === 'factura';
+    const conValor = pagos.map((p) => ({
+      metodo: p.metodo,
+      valor: p.valor === null ? (pagos.length === 1 ? t.total : 0) : p.valor,
+    }));
+    const pagados = conValor.filter((p) => Number(p.valor) > 0);
+    const forma = pagados.length === 0 ? 'Sin registrar' : pagados.length === 1 ? pagados[0].metodo : 'Mixto';
+
+    const filas =
+      items
+        .map(
+          (i) => `<tr><td>${esc(i.descripcion)}</td><td>${nfCant.format(i.cantidad)}</td>
+            <td>${pesos(i.precio)}</td><td>${pesos(i.cantidad * i.precio)}</td></tr>`
+        )
+        .join('') || '<tr><td colspan="4">&nbsp;</td></tr>';
+
+    const detallePago =
+      pagados.length > 1 || cambio
+        ? `<div class="fx-detalle">
+             ${pagados.map((p) => `<span>${esc(p.metodo)}</span><span>${pesos(p.valor)}</span>`).join('')}
+             ${cambio ? `<span>Cambio</span><span>${pesos(cambio)}</span>` : ''}
+           </div>`
+        : '';
+
+    return `<div class="fx">
+      <div class="fx-cab">
+        <div class="fx-negocio">
+          <strong>${esc(a.encabezado || a.nombre)}</strong>
+          ${a.direccion ? `<div>${esc(a.direccion)}</div>` : ''}
+          <div>${a.telefono ? 'Tel: ' + esc(a.telefono) : ''}${a.telefono && a.nit ? ' · ' : ''}${a.nit ? 'NIT: ' + esc(a.nit) : ''}</div>
+        </div>
+        <div class="fx-doc">
+          <div class="fx-tipo">${esFactura ? 'Factura de venta' : 'Cotización'}</div>
+          <div class="fx-num">N° ${A.numero}</div>
+          <div>${fecha}</div>
+          <div>${hora}</div>
+        </div>
+      </div>
+      <div class="fx-cliente">
+        <div><span>Cliente:</span><b>${esc($('#fCliente').value || 'Consumidor final')}</b></div>
+        <div><span>Atendió:</span><b>${esc(A.vendedor)}</b></div>
+      </div>
+      <table>
+        <thead><tr><th>Producto</th><th style="width:12%">Cantidad</th><th style="width:18%">V. unitario</th><th style="width:18%">V. total</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      <div class="fx-resumen">
+        <div class="fx-pago">
+          <div class="fx-rotulo">${esFactura ? 'Forma de pago' : 'Validez'}</div>
+          <b>${esFactura ? esc(forma) : '15 días'}</b>
+          ${esFactura ? detallePago : ''}
+        </div>
+        <div class="fx-totales">
+          <span>Subtotal</span><span>${pesos(t.subtotal)}</span>
+          ${t.descuento ? `<span>Descuento</span><span>- ${pesos(t.descuento)}</span>` : ''}
+          ${t.iva ? `<span>IVA 19%</span><span>${pesos(t.iva)}</span>` : ''}
+          <i></i><span class="fx-total">${esFactura ? 'Total a pagar' : 'Total cotizado'}</span>
+          <span class="fx-total">${pesos(t.total)}</span>
+        </div>
+      </div>
+      ${a.nota ? `<div class="fx-nota">${esc(a.nota)}</div>` : ''}
+      <div class="fx-firmas">
+        <div>${esFactura ? 'Firma del vendedor' : 'Elaborado por'}</div>
+        <div>${esFactura ? 'Recibí conforme' : 'Aceptado por el cliente'}</div>
+      </div>
     </div>`;
   }
 

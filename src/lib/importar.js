@@ -152,4 +152,35 @@ function plantillaExcel() {
   return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
 }
 
-module.exports = { leerInventario, plantillaExcel, aNumero, aBooleano };
+// Exporta el inventario que ya existe, con los mismos encabezados que luego se vuelven a leer:
+// se descarga, se llena en Excel y se sube otra vez. Para el personal del almacén NO va el costo.
+function inventarioExcel(productos, { conCosto = false } = {}) {
+  const datos = productos.map((p) => {
+    const fila = {
+      nombre: p.nombre,
+      unidad: p.unidad,
+      precio_venta: Number(p.precio_venta),
+    };
+    if (conCosto) fila.precio_costo = Number(p.precio_costo);
+    fila.existencias = Number(p.existencias);
+    fila.controla_stock = p.controla_stock ? 'si' : 'no';
+    return fila;
+  });
+
+  // Si el almacén todavía no tiene nada, se baja una fila de ejemplo para que se vea el formato.
+  if (datos.length === 0) {
+    const ejemplo = { nombre: 'LAMINA PVC IMP', unidad: 'unidad', precio_venta: 27000 };
+    if (conCosto) ejemplo.precio_costo = 18000;
+    ejemplo.existencias = 50;
+    ejemplo.controla_stock = 'si';
+    datos.push(ejemplo);
+  }
+
+  const hoja = XLSX.utils.json_to_sheet(datos);
+  hoja['!cols'] = [{ wch: 36 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Inventario');
+  return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
+}
+
+module.exports = { leerInventario, plantillaExcel, inventarioExcel, aNumero, aBooleano };

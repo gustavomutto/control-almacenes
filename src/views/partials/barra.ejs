@@ -9,6 +9,8 @@
       <a href="/almacen/cotizar" class="<%= activo === 'cotizar' ? 'activo' : '' %>">Cotizar</a>
       <a href="/almacen/documentos" class="<%= activo === 'documentos' ? 'activo' : '' %>">Facturas</a>
       <a href="/almacen/productos" class="<%= activo === 'productos' ? 'activo' : '' %>">Productos</a>
+      <a href="/almacen/traslados" class="<%= activo === 'traslados' ? 'activo' : '' %>">Traslados</a>
+      <a href="/almacen/movimiento" class="<%= activo === 'movimiento' ? 'activo' : '' %>">Movimiento</a>
       <a href="/almacen/caja" class="<%= activo === 'caja' ? 'activo' : '' %>">Caja</a>
       <a href="/almacen/datos" class="<%= activo === 'datos' ? 'activo' : '' %>">Mis datos</a>
     <% } else { %>
@@ -16,6 +18,7 @@
       <a href="/jefa/reporte" class="<%= activo === 'reporte' ? 'activo' : '' %>">Reporte mensual</a>
       <a href="/jefa/gastos" class="<%= activo === 'gastos' ? 'activo' : '' %>">Gastos</a>
       <a href="/jefa/costos" class="<%= activo === 'costos' ? 'activo' : '' %>">Costos</a>
+      <a href="/jefa/traslados" class="<%= activo === 'traslados' ? 'activo' : '' %>">Traslados</a>
       <a href="/jefa/importar" class="<%= activo === 'importar' ? 'activo' : '' %>">Subir Excel</a>
       <a href="/jefa/reparar" class="<%= activo === 'reparar' ? 'activo' : '' %>">Reparar</a>
       <% if (usuario.rol === 'admin') { %>

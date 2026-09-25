@@ -1,0 +1,133 @@
+<%- include('../partials/head', { titulo: 'Movimiento del día — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'movimiento' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Movimiento del día</h2>
+        <p class="ayuda" style="margin:0">Qué material salió hoy de <%= almacen.nombre %>: vendido, trasladado y lo que entró.</p>
+      </div>
+      <form method="get" action="/almacen/movimiento" style="margin-left:auto">
+        <label class="campo">Día <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Vendido</span><strong><%= fmt(movimiento.totales.venta) %></strong></div>
+      <div class="tarjeta"><span>Unidades vendidas</span><strong><%= fmtCant(movimiento.totales.unidades) %></strong></div>
+      <div class="tarjeta"><span>Materiales distintos</span><strong><%= movimiento.totales.materiales %></strong></div>
+      <div class="tarjeta"><span>Salió por traslado</span><strong><%= fmtCant(movimiento.totales.unidadesEnviadas) %></strong></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Material vendido hoy</h3>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad</th><th>Unidad</th><th class="n">Vendido</th></tr></thead>
+      <tbody>
+        <% movimiento.vendido.forEach(l => { %>
+          <tr>
+            <td><%= l.material %></td>
+            <td class="n"><%= fmtCant(l.cantidad) %></td>
+            <td><%= l.unidad %></td>
+            <td class="n"><%= fmt(l.total) %></td>
+          </tr>
+        <% }) %>
+        <% if (movimiento.vendido.length === 0) { %>
+          <tr><td colspan="4" class="vacio">No se ha vendido nada este día.</td></tr>
+        <% } %>
+      </tbody>
+      <% if (movimiento.vendido.length > 0) { %>
+        <tfoot>
+          <tr>
+            <td>Total</td>
+            <td class="n"><%= fmtCant(movimiento.totales.unidades) %></td>
+            <td></td>
+            <td class="n"><%= fmt(movimiento.totales.venta) %></td>
+          </tr>
+        </tfoot>
+      <% } %>
+    </table>
+    <p class="ayuda" style="margin-top:12px">
+      Son <%= movimiento.totales.facturas %> factura(s) del día. Si anulas una factura, su material deja de contar aquí.
+    </p>
+  </div>
+
+  <div class="panel">
+    <h3>Salió por traslado a otro almacén</h3>
+    <p class="ayuda">Esto no es venta: la mercancía cambió de almacén, no se cobró.</p>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad</th><th>Unidad</th><th>Se lo llevó</th></tr></thead>
+      <tbody>
+        <% movimiento.enviados.forEach(l => { %>
+          <tr>
+            <td><%= l.material %></td>
+            <td class="n"><%= fmtCant(l.cantidad) %></td>
+            <td><%= l.unidad %></td>
+            <td><%= l.otro_almacen %></td>
+          </tr>
+        <% }) %>
+        <% if (movimiento.enviados.length === 0) { %>
+          <tr><td colspan="4" class="vacio">No salió mercancía por traslado este día.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Entró al inventario</h3>
+    <table class="tabla">
+      <thead><tr><th>Material</th><th class="n">Cantidad</th><th>Unidad</th><th>De dónde</th></tr></thead>
+      <tbody>
+        <% movimiento.recibidos.forEach(l => { %>
+          <tr>
+            <td><%= l.material %></td>
+            <td class="n"><%= fmtCant(l.cantidad) %></td>
+            <td><%= l.unidad %></td>
+            <td>Traslado de <%= l.otro_almacen %></td>
+          </tr>
+        <% }) %>
+        <% movimiento.entradas.forEach(l => { %>
+          <tr>
+            <td><%= l.material %></td>
+            <td class="n"><%= fmtCant(l.cantidad) %></td>
+            <td><%= l.unidad %></td>
+            <td>Entrada registrada en Productos</td>
+          </tr>
+        <% }) %>
+        <% if (movimiento.recibidos.length === 0 && movimiento.entradas.length === 0) { %>
+          <tr><td colspan="4" class="vacio">No entró mercancía este día.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Registro de los últimos días</h3>
+    <table class="tabla">
+      <thead><tr><th>Día</th><th class="n">Facturas</th><th class="n">Unidades vendidas</th><th class="n">Vendido</th><th></th></tr></thead>
+      <tbody>
+        <% dias.forEach(d => { %>
+          <% const dia = fechaISO(d.fecha); %>
+          <tr<%= dia === fecha ? ' style="font-weight:700"' : '' %>>
+            <td><%= dia %></td>
+            <td class="n"><%= d.facturas %></td>
+            <td class="n"><%= fmtCant(d.unidades) %></td>
+            <td class="n"><%= fmt(d.venta) %></td>
+            <td class="n"><a class="btn linea mini" href="/almacen/movimiento?fecha=<%= dia %>">Ver detalle</a></td>
+          </tr>
+        <% }) %>
+        <% if (dias.length === 0) { %>
+          <tr><td colspan="5" class="vacio">Todavía no hay ventas registradas.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap">
+    <a class="btn cobrar" href="/almacen/movimiento/imprimir?fecha=<%= fecha %>&auto=0">Imprimir el movimiento del día</a>
+    <a class="btn linea" href="/almacen/movimiento/excel?fecha=<%= fecha %>">Descargar en Excel</a>
+  </div>
+</main>
+</body>
+</html>

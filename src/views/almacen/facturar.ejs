@@ -49,7 +49,7 @@
 
     <aside class="papel-wrap">
       <p class="papel-titulo">Así saldrá impresa — <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %></p>
-      <div class="papel" id="previewFactura"></div>
+      <div class="papel <%= almacen.papel === 'carta' ? 'papel-carta' : '' %>" id="previewFactura"></div>
     </aside>
   </div>
 </main>

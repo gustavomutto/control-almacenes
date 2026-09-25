@@ -61,6 +61,15 @@ const nfCant = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
 app.locals.fmt = (v) => `$ ${nf.format(Number(v) || 0)}`;
 app.locals.fmtCant = (v) => nfCant.format(Number(v) || 0);
 
+// Las columnas DATE llegan como Date a medianoche local; esto las imprime como aaaa-mm-dd
+// sin pasar por UTC, que es lo que adelantaba o atrasaba el día en los listados.
+app.locals.fechaISO = (d) => {
+  if (!d) return '';
+  if (typeof d === 'string') return d.slice(0, 10);
+  const dos = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+};
+
 app.use((req, res, next) => {
   res.locals.usuario = req.session.usuario || null;
   next();

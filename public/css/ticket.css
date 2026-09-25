@@ -48,3 +48,43 @@
   .no-print,.barra{display:none !important}
   #print-area{margin:0;padding:0;box-shadow:none;max-width:none}
 }
+
+/* ---- Factura en hoja carta ----
+   Pensada para leerse como un documento, no como una cuadrícula: sin bordes en cada celda,
+   solo líneas finas que separan bloques. */
+.fx{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.45;width:100%}
+.fx-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;
+  border-bottom:2px solid #111;padding-bottom:10px}
+.fx-negocio strong{display:block;font-size:19px;letter-spacing:.01em;text-transform:uppercase}
+.fx-negocio div{font-size:12.5px}
+.fx-doc{text-align:right;white-space:nowrap}
+.fx-doc .fx-tipo{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.fx-doc .fx-num{font-size:22px;font-weight:700;line-height:1.1}
+.fx-doc div{font-size:12.5px}
+.fx-cliente{display:flex;gap:32px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #C9CFD6}
+.fx-cliente b{font-weight:700}
+.fx-cliente span{color:#555;margin-right:4px}
+.fx table{width:100%;border-collapse:collapse;margin-top:14px}
+.fx thead th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555;
+  text-align:right;padding:0 6px 6px;border-bottom:1.5px solid #111}
+.fx thead th:first-child{text-align:left;padding-left:0}
+.fx tbody td{padding:6px;border-bottom:1px solid #E4E8EC;text-align:right;vertical-align:top}
+.fx tbody td:first-child{text-align:left;padding-left:0}
+.fx tbody td small{display:block;color:#555;font-weight:400}
+.fx-resumen{display:flex;justify-content:space-between;gap:36px;margin-top:16px;flex-wrap:wrap}
+.fx-pago{min-width:220px}
+.fx-pago .fx-rotulo{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+.fx-pago b{font-size:14px}
+.fx-pago .fx-detalle{display:grid;grid-template-columns:1fr auto;column-gap:18px;margin-top:4px}
+.fx-totales{min-width:250px;margin-left:auto;display:grid;grid-template-columns:1fr auto;
+  column-gap:22px;row-gap:3px;text-align:right}
+.fx-totales i{grid-column:1/-1;border-top:1.5px solid #111;margin-top:5px}
+.fx-totales .fx-total{font-size:17px;font-weight:700;padding-top:4px}
+.fx-nota{margin-top:18px;padding-top:10px;border-top:1px solid #C9CFD6;color:#333}
+.fx-firmas{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:42px}
+.fx-firmas div{border-top:1px solid #111;text-align:center;padding-top:4px;font-size:11.5px;color:#555}
+
+/* La vista previa de la hoja carta se muestra encogida, para que quepa al lado de la venta. */
+.papel-carta{padding:0;height:500px;position:relative;overflow:hidden}
+.papel-carta .fx{position:absolute;top:0;left:0;width:216mm;padding:14mm;background:#fff;
+  transform:scale(.45);transform-origin:top left}

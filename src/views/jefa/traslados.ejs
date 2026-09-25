@@ -1,0 +1,96 @@
+<%- include('../partials/head', { titulo: 'Traslados entre almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'traslados' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Traslados entre almacenes</h2>
+        <p class="ayuda" style="margin:0">
+          Mercancía que se mueve de un almacén a otro. No es venta: no entra a la caja ni cambia la ganancia,
+          solo cambia de inventario. El costo viaja con el producto.
+        </p>
+      </div>
+      <form method="get" action="/jefa/traslados" style="margin-left:auto;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <label class="campo">Almacén que envía
+          <select name="origen" onchange="this.form.submit()">
+            <option value="">Elegir para armar una hoja…</option>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>" <%= String(origen) === String(a.id) ? 'selected' : '' %>><%= a.nombre %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Ver historial de
+          <select name="almacen" onchange="this.form.submit()">
+            <option value="">Todos los almacenes</option>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>" <%= String(almacenFiltro) === String(a.id) ? 'selected' : '' %>><%= a.nombre %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Desde <input class="in" type="date" name="desde" value="<%= desde %>"></label>
+        <label class="campo">Hasta <input class="in" type="date" name="hasta" value="<%= hasta %>"></label>
+        <button class="btn linea" type="submit">Ver</button>
+      </form>
+    </div>
+  </div>
+
+  <% if (origen) { %>
+    <% const almacenOrigen = almacenes.find(a => String(a.id) === String(origen)); %>
+    <%- include('../partials/traslado_form', {
+          destinos: almacenes.filter(a => String(a.id) !== String(origen)),
+          hoy,
+          origenNombre: almacenOrigen ? almacenOrigen.nombre : ''
+        }) %>
+  <% } %>
+
+  <div class="panel">
+    <h3>Historial</h3>
+    <table class="tabla">
+      <thead>
+        <tr><th>N°</th><th>Fecha</th><th>Envía</th><th>Recibe</th><th class="n">Productos</th><th class="n">Unidades</th><th>Quién llevó</th><th>Registró</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% historial.forEach(t => { %>
+          <tr<%= t.anulado ? ' class="anulada"' : '' %>>
+            <td><%= t.numero %></td>
+            <td><%= fechaISO(t.fecha) %></td>
+            <td><%= t.origen_nombre %></td>
+            <td><%= t.destino_nombre %></td>
+            <td class="n"><%= t.lineas %></td>
+            <td class="n"><%= fmtCant(t.unidades) %></td>
+            <td><%= t.responsable || '—' %></td>
+            <td><%= t.registrado_nombre || '—' %></td>
+            <td class="n">
+              <a class="btn linea mini" href="/jefa/traslados/imprimir/<%= t.id %>?auto=0">Ver hoja</a>
+              <% if (!t.anulado) { %>
+                <form method="post" action="/jefa/traslados/<%= t.id %>/anular" style="display:inline"
+                      onsubmit="return confirm('¿Anular este traslado? La mercancía vuelve al almacén que la envió.')">
+                  <button class="btn peligro mini" type="submit">Anular</button>
+                </form>
+              <% } else { %><span class="chip">anulado</span><% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (historial.length === 0) { %>
+          <tr><td colspan="9" class="vacio">No hay traslados en este filtro.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<% if (origen) { %>
+<script>
+window.APP = {
+  productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
+  origenFijo: <%= Number(origen) %>,
+  endpoint: '/jefa/traslados'
+};
+</script>
+<script src="/js/traslado.js?v=<%= v %>"></script>
+<% } %>
+</body>
+</html>

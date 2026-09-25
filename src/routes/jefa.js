@@ -3,8 +3,11 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
-const { leerInventario, plantillaExcel } = require('../lib/importar');
+const { plantillaExcel, inventarioExcel } = require('../lib/importar');
+const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
 const { detectarInvertidos, repararInvertidos, repararCostos } = require('../lib/reparar');
+const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
+const { papelCss, fechaTexto, horaTexto } = require('../lib/impresion');
 
 const router = express.Router();
 
@@ -410,6 +413,84 @@ router.post('/reparar/costos', soloAdmin, async (req, res) => {
   }
 });
 
+// ======================= TRASLADOS ENTRE ALMACENES =======================
+// Admin/jefa puede mandar mercancía de cualquier almacén a cualquier otro, y ve el historial
+// completo. El traslado no es una venta: no entra a la caja ni afecta la ganancia.
+
+router.get('/traslados', async (req, res) => {
+  const almacenFiltro = req.query.almacen || '';
+  const desde = (req.query.desde || '').trim() || null;
+  const hasta = (req.query.hasta || '').trim() || null;
+  const origen = req.query.origen || almacenFiltro || '';
+
+  const [almacenes, historial, productos] = await Promise.all([
+    pool.query(SQL_ALMACENES),
+    listarTraslados(pool, { almacenId: almacenFiltro || null, desde, hasta, limite: 200 }),
+    origen
+      ? pool.query(
+          `SELECT id, nombre, unidad, existencias, controla_stock
+           FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+          [origen]
+        )
+      : { rows: [] },
+  ]);
+
+  res.render('jefa/traslados', {
+    almacenes: almacenes.rows,
+    almacenFiltro,
+    origen: origen ? String(origen) : '',
+    desde: desde || '',
+    hasta: hasta || '',
+    productos: productos.rows,
+    historial,
+    hoy: hoyISO(),
+    activo: 'traslados',
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/traslados', express.json({ limit: '256kb' }), async (req, res) => {
+  try {
+    const t = await crearTraslado(pool, {
+      origenId: req.body.origen_id,
+      destinoId: req.body.destino_id,
+      usuarioId: req.session.usuario.id,
+      cuerpo: req.body,
+    });
+    res.json({ ok: true, id: t.id, numero: t.numero, imprimir: `/jefa/traslados/imprimir/${t.id}` });
+  } catch (err) {
+    console.error('Error al trasladar:', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/traslados/:id/anular', soloAdmin, async (req, res) => {
+  try {
+    await anularTraslado(pool, { trasladoId: req.params.id, usuarioId: req.session.usuario.id });
+    res.redirect('/jefa/traslados?ok=' + encodeURIComponent('Traslado anulado; la mercancía volvió a su almacén.'));
+  } catch (err) {
+    res.redirect('/jefa/traslados?error=' + encodeURIComponent(err.message));
+  }
+});
+
+router.get('/traslados/imprimir/:id', async (req, res) => {
+  const datos = await cargarTraslado(pool, req.params.id, null);
+  if (!datos) return res.status(404).render('404');
+
+  const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1', [datos.traslado.origen_id]);
+  res.render('imprimir_traslado', {
+    almacen: rows[0],
+    traslado: datos.traslado,
+    items: datos.items,
+    papelCss: papelCss(rows[0].papel),
+    hora: horaTexto(datos.traslado.creado_en),
+    fechaTexto: fechaTexto(datos.traslado.fecha),
+    volver: '/jefa/traslados',
+    auto: req.query.auto !== '0',
+  });
+});
+
 // ======================= IMPORTAR INVENTARIO DESDE EXCEL =======================
 
 router.get('/importar', async (req, res) => {
@@ -430,57 +511,59 @@ router.get('/importar/plantilla', (req, res) => {
   res.send(plantillaExcel());
 });
 
+// Descargar el inventario que ya tiene un almacén, con costos, para editarlo y volverlo a subir.
+router.get('/importar/inventario', async (req, res) => {
+  const almacenId = req.query.almacen;
+  if (!almacenId) return res.redirect('/jefa/importar?error=' + encodeURIComponent('Elige primero el almacén.'));
+
+  const [almacen, productos] = await Promise.all([
+    pool.query('SELECT nombre FROM almacenes WHERE id = $1', [almacenId]),
+    pool.query(
+      `SELECT nombre, unidad, precio_venta, precio_costo, existencias, controla_stock
+       FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+      [almacenId]
+    ),
+  ]);
+  if (almacen.rows.length === 0) {
+    return res.redirect('/jefa/importar?error=' + encodeURIComponent('Almacén no encontrado.'));
+  }
+
+  const archivo = `inventario_${almacen.rows[0].nombre.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+  res.send(inventarioExcel(productos.rows, { conCosto: true }));
+});
+
 // Paso 1: leer el archivo y mostrar qué va a pasar, sin tocar la base de datos.
 router.post('/importar/revisar', subida.single('archivo'), async (req, res) => {
-  const almacenes = await pool.query(SQL_ALMACENES);
   const almacenId = req.body.almacen_id;
-
   if (!req.file || !almacenId) {
     return res.redirect('/jefa/importar?error=' + encodeURIComponent('Elige el almacén y el archivo.'));
   }
 
-  let lectura;
+  let revision;
   try {
-    lectura = leerInventario(req.file.buffer);
+    revision = await revisarInventario(pool, almacenId, req.file.buffer);
   } catch (err) {
     return res.redirect(
       '/jefa/importar?error=' + encodeURIComponent('No pude leer el archivo. ¿Es un Excel (.xlsx) o un CSV?')
     );
   }
 
-  if (lectura.filas.length === 0) {
+  if (revision.filas.length === 0) {
     return res.redirect(
-      '/jefa/importar?error=' + encodeURIComponent(lectura.errores[0] || 'El archivo no tiene productos.')
+      '/jefa/importar?error=' + encodeURIComponent(revision.errores[0] || 'El archivo no tiene productos.')
     );
   }
 
-  // ¿Cuáles ya existen en ese almacén? Para avisar qué se crea y qué se actualiza.
-  const { rows: existentes } = await pool.query(
-    'SELECT id, nombre, precio_venta, precio_costo, existencias FROM productos WHERE almacen_id = $1',
-    [almacenId]
-  );
-  const porNombre = new Map(existentes.map((p) => [p.nombre.toLowerCase(), p]));
-
-  const filas = lectura.filas.map((f) => {
-    const actual = porNombre.get(f.nombre.toLowerCase());
-    return { ...f, accion: actual ? 'actualizar' : 'crear', actual: actual || null };
-  });
-
+  const almacenes = await pool.query(SQL_ALMACENES);
   res.render('jefa/importar', {
     almacenes: almacenes.rows,
     almacenFiltro: String(almacenId),
     previo: {
-      filas,
-      errores: lectura.errores,
-      columnas: lectura.columnasDetectadas,
+      ...revision,
       modoExistencias: req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar',
       nombreArchivo: req.file.originalname,
-      nuevos: filas.filter((f) => f.accion === 'crear').length,
-      actualizados: filas.filter((f) => f.accion === 'actualizar').length,
-      // Aviso temprano: si en casi todas las filas el "costo" es mayor que la "venta",
-      // lo más probable es que las dos columnas del archivo estén cambiadas.
-      invertidas: filas.filter((f) => Number(f.precio_costo) > Number(f.precio_venta) && Number(f.precio_venta) > 0)
-        .length,
     },
     mensaje: null,
     error: null,
@@ -491,8 +574,6 @@ router.post('/importar/revisar', subida.single('archivo'), async (req, res) => {
 // Paso 2: aplicar lo revisado.
 router.post('/importar/aplicar', async (req, res) => {
   const almacenId = req.body.almacen_id;
-  const modo = req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar';
-  const invertir = req.body.invertir === '1';
 
   let filas;
   try {
@@ -500,63 +581,23 @@ router.post('/importar/aplicar', async (req, res) => {
   } catch (err) {
     return res.redirect('/jefa/importar?error=' + encodeURIComponent('Se perdió la vista previa. Sube el archivo otra vez.'));
   }
-  if (!Array.isArray(filas) || filas.length === 0 || !almacenId) {
-    return res.redirect('/jefa/importar?error=' + encodeURIComponent('No hay nada que importar.'));
-  }
 
-  const client = await pool.connect();
-  let creados = 0;
-  let actualizados = 0;
   try {
-    await client.query('BEGIN');
-    for (const f of filas) {
-      const nombre = String(f.nombre || '').trim();
-      if (!nombre) continue;
-
-      const existencias = Number(f.existencias) || 0;
-      // Si el archivo traía las columnas cambiadas, se enderezan aquí, antes de guardar.
-      const venta = Number(invertir ? f.precio_costo : f.precio_venta) || 0;
-      const costo = Number(invertir ? f.precio_venta : f.precio_costo) || 0;
-      const { rows } = await client.query(
-        `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, precio_costo, existencias, controla_stock)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (almacen_id, nombre) DO UPDATE SET
-           unidad = EXCLUDED.unidad,
-           precio_venta = EXCLUDED.precio_venta,
-           precio_costo = EXCLUDED.precio_costo,
-           existencias = CASE WHEN $8 = 'sumar' THEN productos.existencias + EXCLUDED.existencias
-                              ELSE EXCLUDED.existencias END,
-           controla_stock = EXCLUDED.controla_stock,
-           activo = true,
-           actualizado_en = now()
-         RETURNING (xmax = 0) AS fue_creado`,
-        [
-          almacenId,
-          nombre,
-          String(f.unidad || 'unidad').slice(0, 30),
-          venta,
-          costo,
-          existencias,
-          f.controla_stock !== false,
-          modo,
-        ]
-      );
-      if (rows[0].fue_creado) creados++;
-      else actualizados++;
-    }
-    await client.query('COMMIT');
+    const { creados, actualizados } = await aplicarInventario(pool, {
+      almacenId,
+      filas,
+      modo: req.body.modo_existencias,
+      invertir: req.body.invertir === '1',
+      conCosto: true, // admin/jefa sí manejan el precio de costo
+    });
+    res.redirect(
+      `/jefa/importar?almacen=${almacenId}&ok=` +
+        encodeURIComponent(`Listo: ${creados} producto(s) nuevo(s) y ${actualizados} actualizado(s).`)
+    );
   } catch (err) {
-    await client.query('ROLLBACK');
     console.error('Error importando inventario:', err);
-    return res.redirect('/jefa/importar?error=' + encodeURIComponent('No se pudo guardar: ' + err.message));
-  } finally {
-    client.release();
+    res.redirect('/jefa/importar?error=' + encodeURIComponent('No se pudo guardar: ' + err.message));
   }
-
-  res.redirect(
-    `/jefa/importar?almacen=${almacenId}&ok=` +
-      encodeURIComponent(`Listo: ${creados} producto(s) nuevo(s) y ${actualizados} actualizado(s).`)
-  );
 });
 
 // ======================= ADMINISTRACIÓN =======================

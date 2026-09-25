@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movimiento del día — <%= fechaTexto %></title>
+<link rel="stylesheet" href="/css/estilo.css?v=<%= v %>">
+<link rel="stylesheet" href="/css/ticket.css?v=<%= v %>">
+<link rel="icon" href="data:,">
+<style><%- papelCss %></style>
+</head>
+<body class="modo-impresion">
+  <div class="barra-imprimir no-print">
+    <a class="btn linea" href="/almacen/movimiento?fecha=<%= fecha %>">← Volver</a>
+    <span>Movimiento del día · <%= fechaTexto %></span>
+    <button class="btn prim" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <div id="print-area">
+    <div class="tk">
+      <div class="c"><%= almacen.encabezado || almacen.nombre %></div>
+      <div class="c"><%= almacen.direccion %></div>
+      <div class="c tk-tipo">MATERIAL VENDIDO</div>
+      <div class="tk-f3"><span>Día:</span><span></span><span class="r"><%= fechaTexto %></span></div>
+      <div class="tk-f3"><span>Impreso:</span><span></span><span class="r"><%= hora %></span></div>
+      <div class="tk-cli"><span>FACTURAS: <%= movimiento.totales.facturas %></span><span class="r"><%= fmt(movimiento.totales.venta) %></span></div>
+
+      <table>
+        <thead><tr><th class="l">Material</th><th>cant</th><th class="r">Vendido</th></tr></thead>
+        <tbody>
+          <% movimiento.vendido.forEach(l => { %>
+            <tr>
+              <td><%= l.material %></td>
+              <td class="c"><%= fmtCant(l.cantidad) %></td>
+              <td class="r"><%= fmt(l.total) %></td>
+            </tr>
+          <% }) %>
+          <% if (movimiento.vendido.length === 0) { %>
+            <tr><td colspan="3" class="c">Sin ventas este día</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+
+      <div class="tk-cuadre">
+        <span class="tk-grande">UNIDADES VENDIDAS</span><span class="r tk-grande"><%= fmtCant(movimiento.totales.unidades) %></span>
+        <span class="tk-grande">VENTA TOTAL</span><span class="r tk-grande"><%= fmt(movimiento.totales.venta) %></span>
+      </div>
+
+      <% if (movimiento.enviados.length > 0) { %>
+        <div class="tk-cuadre">
+          <i class="tk-sep"></i>
+          <span>SALIÓ POR TRASLADO (no es venta)</span><span></span>
+          <% movimiento.enviados.forEach(l => { %>
+            <span class="ind suave"><%= l.material %> → <%= l.otro_almacen %></span>
+            <span class="r suave"><%= fmtCant(l.cantidad) %> <%= l.unidad %></span>
+          <% }) %>
+          <span>TOTAL UNIDADES</span><span class="r"><%= fmtCant(movimiento.totales.unidadesEnviadas) %></span>
+        </div>
+      <% } %>
+
+      <% if (movimiento.recibidos.length > 0 || movimiento.entradas.length > 0) { %>
+        <div class="tk-cuadre">
+          <i class="tk-sep"></i>
+          <span>ENTRÓ AL INVENTARIO</span><span></span>
+          <% movimiento.recibidos.forEach(l => { %>
+            <span class="ind suave"><%= l.material %> ← <%= l.otro_almacen %></span>
+            <span class="r suave"><%= fmtCant(l.cantidad) %> <%= l.unidad %></span>
+          <% }) %>
+          <% movimiento.entradas.forEach(l => { %>
+            <span class="ind suave"><%= l.material %></span>
+            <span class="r suave"><%= fmtCant(l.cantidad) %> <%= l.unidad %></span>
+          <% }) %>
+        </div>
+      <% } %>
+
+      <div class="tk-firmas"><div>Revisado por</div><div>Recibido por</div></div>
+    </div>
+  </div>
+
+<% if (auto) { %>
+<script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+<% } %>
+</body>
+</html>

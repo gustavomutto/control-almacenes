@@ -1,0 +1,47 @@
+<div class="panel">
+  <h2 style="margin-bottom:2px">Nueva hoja de traslado</h2>
+  <p class="ayuda">
+    Manda mercancía a otro almacén. <b>No lleva precio</b>: no es una venta, no entra a la caja y no afecta la
+    ganancia de nadie. Al guardar, la mercancía sale de <b><%= origenNombre %></b> y entra al inventario del
+    almacén que la recibe.
+  </p>
+
+  <div class="rejilla tres" style="margin-top:14px">
+    <label class="campo">Almacén que recibe
+      <select id="tDestino">
+        <option value="">Elegir…</option>
+        <% destinos.forEach(d => { %><option value="<%= d.id %>"><%= d.nombre %></option><% }) %>
+      </select>
+    </label>
+    <label class="campo">Fecha <input class="in" id="tFecha" type="date" value="<%= hoy %>" max="<%= hoy %>"></label>
+    <label class="campo">Quién lleva la mercancía <input class="in" id="tResponsable" type="text" placeholder="Nombre del que transporta"></label>
+  </div>
+
+  <div class="buscador" style="margin-top:16px">
+    <input id="buscar" type="text" autocomplete="off" spellcheck="false"
+           placeholder="Buscar producto y presionar Enter" aria-label="Buscar producto">
+    <p class="pista">Para mandar varias unidades escribe la cantidad primero: <b>10*lamina</b></p>
+    <ul id="sugerencias" class="sugerencias" hidden></ul>
+  </div>
+
+  <div class="tabla-wrap" style="margin-top:12px">
+    <table class="tabla items-venta">
+      <thead><tr><th>Producto</th><th class="n">En inventario</th><th class="n">Cantidad que envía</th><th></th></tr></thead>
+      <tbody id="itemsTraslado"></tbody>
+    </table>
+    <div class="vacio" id="vacioTraslado">Busca un producto arriba y presiona Enter para agregarlo a la hoja.</div>
+  </div>
+
+  <label class="campo" style="margin-top:14px">Nota (opcional)
+    <input class="in" id="tNota" type="text" placeholder="Ej: pedido del cliente de la 11, va en la moto">
+  </label>
+
+  <div class="cobro" style="margin-top:16px">
+    <div class="total"><span>Unidades que salen</span><strong id="tUnidades">0</strong></div>
+    <div class="acciones">
+      <button class="btn sec" id="btnLimpiar" type="button">Limpiar</button>
+      <button class="btn cobrar" id="btnGuardar" type="button">Guardar e imprimir hoja</button>
+    </div>
+  </div>
+  <p class="ayuda" id="tAviso" style="margin-top:10px"></p>
+</div>

@@ -1,0 +1,96 @@
+<%
+  // Factura en hoja carta: la información, sin la cuadrícula.
+  const esFactura = doc.tipo === 'factura';
+  const pagados = (pagos || []).filter((p) => Number(p.valor) > 0);
+  const formaPago = !esFactura ? '' : pagados.length === 0 ? 'Sin registrar'
+    : pagados.length === 1 ? pagados[0].metodo : 'Mixto';
+%>
+<div class="fx">
+  <div class="fx-cab">
+    <div class="fx-negocio">
+      <strong><%= almacen.encabezado || almacen.nombre %></strong>
+      <% if (almacen.direccion) { %><div><%= almacen.direccion %></div><% } %>
+      <div>
+        <% if (almacen.telefono) { %>Tel: <%= almacen.telefono %><% } %>
+        <% if (almacen.telefono && almacen.nit) { %> · <% } %>
+        <% if (almacen.nit) { %>NIT: <%= almacen.nit %><% } %>
+      </div>
+    </div>
+    <div class="fx-doc">
+      <div class="fx-tipo"><%= esFactura ? 'Factura de venta' : 'Cotización' %></div>
+      <div class="fx-num">N° <%= doc.numero %></div>
+      <div><%= fechaTexto %></div>
+      <div><%= hora %></div>
+    </div>
+  </div>
+
+  <div class="fx-cliente">
+    <div><span>Cliente:</span><b><%= doc.cliente || 'Consumidor final' %></b></div>
+    <% if (doc.m2) { %><div><span>Área:</span><b><%= fmtCant(doc.m2) %> m²</b></div><% } %>
+    <% if (doc.vendedor) { %><div><span>Atendió:</span><b><%= doc.vendedor %></b></div><% } %>
+    <% if (doc.anulada) { %><div><b>*** ANULADA ***</b></div><% } %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th style="width:12%">Cantidad</th>
+        <th style="width:18%">V. unitario</th>
+        <th style="width:18%">V. total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.forEach(i => { %>
+        <tr>
+          <td>
+            <%= i.descripcion %>
+            <% if (i.detalle) { %><small><%= i.detalle %></small><% } %>
+          </td>
+          <td><%= fmtCant(i.cantidad) %></td>
+          <td><%= fmt(i.precio_unit) %></td>
+          <td><%= fmt(i.total) %></td>
+        </tr>
+      <% }) %>
+      <% if (items.length === 0) { %><tr><td colspan="4">&nbsp;</td></tr><% } %>
+    </tbody>
+  </table>
+
+  <div class="fx-resumen">
+    <div class="fx-pago">
+      <% if (esFactura) { %>
+        <div class="fx-rotulo">Forma de pago</div>
+        <b><%= formaPago %></b>
+        <% if (pagados.length > 1 || Number(doc.cambio)) { %>
+          <div class="fx-detalle">
+            <% pagados.forEach(p => { %>
+              <span><%= p.metodo %></span><span><%= fmt(p.valor) %></span>
+            <% }) %>
+            <% if (Number(doc.cambio)) { %><span>Cambio</span><span><%= fmt(doc.cambio) %></span><% } %>
+          </div>
+        <% } %>
+      <% } else { %>
+        <div class="fx-rotulo">Validez</div>
+        <b>15 días</b>
+      <% } %>
+    </div>
+
+    <div class="fx-totales">
+      <span>Subtotal</span><span><%= fmt(doc.subtotal) %></span>
+      <% if (Number(doc.descuento)) { %><span>Descuento</span><span>- <%= fmt(doc.descuento) %></span><% } %>
+      <% if (Number(doc.iva)) { %><span>IVA 19%</span><span><%= fmt(doc.iva) %></span><% } %>
+      <i></i>
+      <span class="fx-total"><%= esFactura ? 'Total a pagar' : 'Total cotizado' %></span>
+      <span class="fx-total"><%= fmt(doc.total) %></span>
+    </div>
+  </div>
+
+  <% if (almacen.nota) { %>
+    <div class="fx-nota"><%= almacen.nota %></div>
+  <% } %>
+
+  <div class="fx-firmas">
+    <div><%= esFactura ? 'Firma del vendedor' : 'Elaborado por' %></div>
+    <div><%= esFactura ? 'Recibí conforme' : 'Aceptado por el cliente' %></div>
+  </div>
+</div>

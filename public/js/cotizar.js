@@ -177,6 +177,53 @@
         )
         .join('') || '<tr><td colspan="4">&nbsp;</td></tr>';
 
+    // En hoja carta la cotización se ve como documento, no como tirilla.
+    if (a.papel === 'carta') {
+      const filasCarta =
+        items
+          .map(
+            (i) => `<tr><td>${esc(i.descripcion)}</td><td>${nfCant.format(i.cantidad)}</td>
+              <td>${pesos(i.precio)}</td><td>${pesos(i.cantidad * i.precio)}</td></tr>`
+          )
+          .join('') || '<tr><td colspan="4">&nbsp;</td></tr>';
+
+      $('#previewFactura').innerHTML = `<div class="fx">
+        <div class="fx-cab">
+          <div class="fx-negocio">
+            <strong>${esc(a.encabezado || a.nombre)}</strong>
+            ${a.direccion ? `<div>${esc(a.direccion)}</div>` : ''}
+            <div>${a.telefono ? 'Tel: ' + esc(a.telefono) : ''}${a.telefono && a.nit ? ' · ' : ''}${a.nit ? 'NIT: ' + esc(a.nit) : ''}</div>
+          </div>
+          <div class="fx-doc">
+            <div class="fx-tipo">Cotización</div>
+            <div>${fecha}</div>
+            <div>${hora}</div>
+          </div>
+        </div>
+        <div class="fx-cliente">
+          <div><span>Cliente:</span><b>${esc($('#fCliente').value || 'Cliente')}</b></div>
+          ${m2 ? `<div><span>Área:</span><b>${nfCant.format(m2)} m²</b></div>` : ''}
+          <div><span>Atendió:</span><b>${esc(A.vendedor)}</b></div>
+        </div>
+        <table>
+          <thead><tr><th>Material</th><th style="width:12%">Cantidad</th><th style="width:18%">V. unitario</th><th style="width:18%">V. total</th></tr></thead>
+          <tbody>${filasCarta}</tbody>
+        </table>
+        <div class="fx-resumen">
+          <div class="fx-pago"><div class="fx-rotulo">Validez</div><b>15 días</b></div>
+          <div class="fx-totales">
+            <span>Subtotal</span><span>${pesos(t.subtotal)}</span>
+            ${t.descuento ? `<span>Descuento</span><span>- ${pesos(t.descuento)}</span>` : ''}
+            ${t.iva ? `<span>IVA 19%</span><span>${pesos(t.iva)}</span>` : ''}
+            <i></i><span class="fx-total">Total cotizado</span><span class="fx-total">${pesos(t.total)}</span>
+          </div>
+        </div>
+        ${a.nota ? `<div class="fx-nota">${esc(a.nota)}</div>` : ''}
+        <div class="fx-firmas"><div>Elaborado por</div><div>Aceptado por el cliente</div></div>
+      </div>`;
+      return;
+    }
+
     $('#previewFactura').innerHTML = `<div class="tk">
       <div class="c">${esc(a.encabezado || a.nombre)}</div>
       <div class="c">${esc(a.direccion)}</div>

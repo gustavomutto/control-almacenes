@@ -11,6 +11,7 @@ Sistema web para varios almacenes. Cada almacén tiene su propio sitio de factur
 | Inventario y precios de venta | Sí (su almacén) | Consulta | Consulta |
 | **Precio de costo y ganancia** | **No lo ve nunca** | Sí | Sí |
 | Reportes de todos los almacenes | No | Sí | Sí |
+| Trasladar mercancía a otro almacén | Sí (desde el suyo) | Sí (desde cualquiera) | Sí (desde cualquiera) |
 | Crear/borrar almacenes, sedes y usuarios | No | Sí | Sí |
 
 La idea de fondo: **el vendedor factura al precio que quiera**; el costo lo pone la
@@ -26,16 +27,63 @@ administración y la ganancia se calcula solo para ellos.
   sueltos. Las cotizaciones no mueven inventario.
 - **Facturas**: historial por día, reimprimir y anular (al anular, el inventario se devuelve).
 - **Productos**: catálogo con precio de venta, unidad y existencias; registrar entradas de
-  mercancía.
+  mercancía, y cargar el inventario desde Excel (se descarga como está hoy, se llena y se sube).
+- **Traslados**: hoja para mandar mercancía a otro almacén, sin precios. Sale del inventario de
+  aquí y entra al de allá.
+- **Movimiento**: qué material salió hoy —vendido, trasladado— y qué entró, imprimible.
 - **Caja**: cuadre del día por forma de pago, gastos del día y «efectivo a entregar»
   (efectivo cobrado menos gastos), con cierre imprimible.
 - **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
   impresos.
 
+## Traslados entre almacenes
+
+Mandar mercancía a otro almacén **no es una venta**: no lleva precio, no entra a la caja y no
+cambia la ganancia de nadie. (Facturar a cero pesos sería peor: el que envía se comería el costo
+como pérdida y el que recibe quedaría con ganancia inflada.)
+
+En «Traslados» se arma la hoja con los productos del propio catálogo y las cantidades, se elige el
+almacén que recibe y quién lleva la mercancía, y se imprime con espacio para las dos firmas. Al
+guardar, la mercancía sale del inventario de origen y entra al de destino en el mismo momento. Si
+el producto no existe en el almacén que recibe, se crea allá con su nombre, unidad y **precio de
+costo**, para que la ganancia de ese almacén salga bien cuando lo venda; si ya existía, solo se le
+suma la cantidad y no se le tocan sus precios.
+
+Puede hacer una hoja el propio almacén que envía y también admin/jefa desde su panel, donde además
+se ve el historial completo con filtros por almacén y fecha. Un traslado se puede anular y todo
+vuelve a su sitio; si el almacén de destino ya vendió esa mercancía, el sistema no deja anular y
+lo dice.
+
+## Movimiento del día
+
+Cada almacén tiene la pestaña «Movimiento»: cuánto material salió hoy, producto por producto.
+Muestra lo vendido (cantidad, unidad y valor), lo que salió por traslado hacia otro almacén —marcado
+aparte, porque no es venta— y lo que entró, sea por traslado recibido o por entrada de mercancía.
+Se imprime en el papel del almacén y se puede bajar en Excel. Debajo queda el **registro de los
+últimos 15 días** (facturas, unidades vendidas y valor por día, con un clic para ver el detalle de
+cualquier día). Como la ve el personal, ahí no aparece el costo ni la ganancia.
+
 ## Impresión
 
 Cada almacén se configura en hoja carta o en ticket POS térmico (80mm o 58mm) desde
-«Almacenes y usuarios». Hoy:
+«Almacenes y usuarios», y cada formato tiene su propio diseño:
+
+- **Hoja carta**: una factura normal, pensada para leerse. Arriba el negocio (nombre, dirección,
+  teléfono y NIT) y al frente el tipo de documento, el número, la fecha y la hora; después el
+  cliente y quién atendió; la tabla de productos con cantidad, valor unitario y valor total; los
+  totales a la derecha y la forma de pago a la izquierda; la nota del almacén y las dos firmas.
+  Sin cuadrícula: solo líneas finas que separan los bloques.
+- **Ticket POS (80mm / 58mm)**: el formato de tirilla de siempre, sin cambios.
+
+La **forma de pago** sale sola: si el cliente paga con un solo método dice «Efectivo» o
+«Transferencia»; si paga con dos o más dice **«Mixto»** y debajo el desglose de cuánto fue por cada
+uno (y el cambio, si lo hubo). Los métodos que aparecen en la lista los define cada almacén en
+«Mis datos».
+
+La vista previa de la pantalla de venta muestra el documento tal como va a salir, incluida la hoja
+carta a escala.
+
+Hoy:
 
 | Almacén | Sede | Impresión |
 |---|---|---|
@@ -97,6 +145,15 @@ venta y ofrece una casilla para enderezar las dos columnas antes de guardar.
 
 ## Subir inventario desde Excel
 
+Hay dos puertas al mismo mecanismo:
+
+- **El almacén**, desde «Productos»: descarga su inventario tal como está hoy (nombre, unidad,
+  precio de venta, existencias), lo llena en Excel y lo sube. Su archivo **no trae el precio de
+  costo**, y si alguien le agrega esa columna a mano, se ignora: el costo no se puede ver ni
+  cambiar desde el almacén.
+- **Admin/jefa**, desde «Subir Excel»: lo mismo para cualquier almacén y **con costos**, más la
+  plantilla de ejemplo.
+
 En «Subir Excel» (admin/jefa) se cargan muchos productos de una vez a cualquier almacén.
 Acepta .xlsx, .xls y .csv, con los encabezados en la primera fila. Solo `nombre` es
 obligatorio; reconoce también nombres parecidos («producto», «costo», «cantidad», «stock»)
@@ -144,7 +201,10 @@ src/
   server.js                       servidor (Express)
   lib/calculos.js                  totales, IVA y fórmulas de m²
   lib/impresion.js                 reglas de papel (carta / 80mm / 58mm)
+  lib/inventario.js                cargar inventario desde Excel (con o sin costos)
   lib/reparar.js                   arreglo de precios invertidos y recálculo de facturas
+  lib/traslados.js                 mercancía que pasa de un almacén a otro
+  lib/movimiento.js                material vendido, trasladado y recibido en el día
   db/schema.sql                    estructura de la base de datos (Postgres)
   db/migrate.js                     crea/actualiza las tablas
   db/actualizar_valledupar.js       puesta a punto de los 4 almacenes (segura de repetir)
@@ -152,6 +212,8 @@ src/
   routes/auth.js                    login / logout
   routes/almacen.js                 facturar, cotizar, productos, caja, impresión
   routes/jefa.js                    consolidado, reportes, costos, administración
+  views/partials/factura.ejs        factura en hoja carta
+  views/partials/ticket.ejs         factura en tirilla POS
   views/                            páginas (EJS)
 public/css/estilo.css               estilos
 public/css/ticket.css               formato del ticket/factura impresa

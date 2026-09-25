@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traslado N° <%= traslado.numero %></title>
+<link rel="stylesheet" href="/css/estilo.css?v=<%= v %>">
+<link rel="stylesheet" href="/css/ticket.css?v=<%= v %>">
+<link rel="icon" href="data:,">
+<style><%- papelCss %></style>
+</head>
+<body class="modo-impresion">
+  <div class="barra-imprimir no-print">
+    <a class="btn linea" href="<%= volver %>">← Volver</a>
+    <span>
+      Traslado N° <%= traslado.numero %> ·
+      <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %>
+    </span>
+    <button class="btn prim" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <div id="print-area">
+    <div class="tk">
+      <div class="c"><%= almacen.encabezado || almacen.nombre %></div>
+      <div class="c"><%= almacen.direccion %></div>
+      <div class="c tk-tipo">TRASLADO DE MERCANCÍA</div>
+      <div class="c">NIT: <%= almacen.nit %></div>
+      <div class="c">Tel: <%= almacen.telefono %></div>
+
+      <div class="tk-f3"><span>Fecha/Hora:</span><span class="c"><%= hora %></span><span class="r"><%= fechaTexto %></span></div>
+      <div class="tk-f3"><span>Traslado Nº:</span><span class="c"><%= traslado.numero %></span><span></span></div>
+      <div class="tk-cli"><span>ENVÍA</span><span class="r"><%= traslado.origen_nombre %></span></div>
+      <div class="tk-cli"><span>RECIBE</span><span class="r"><%= traslado.destino_nombre %></span></div>
+      <% if (traslado.responsable) { %>
+        <div class="tk-cli"><span>LLEVA</span><span class="r"><%= traslado.responsable %></span></div>
+      <% } %>
+      <% if (traslado.anulado) { %>
+        <div class="c tk-tipo">*** ANULADO ***</div>
+      <% } %>
+
+      <table>
+        <thead>
+          <tr><th class="l">Material</th><th>cant</th><th class="r">unidad</th></tr>
+        </thead>
+        <tbody>
+          <% items.forEach(i => { %>
+            <tr>
+              <td><%= i.descripcion %></td>
+              <td class="c"><%= fmtCant(i.cantidad) %></td>
+              <td class="r"><%= i.unidad %></td>
+            </tr>
+          <% }) %>
+          <% if (items.length === 0) { %><tr><td colspan="3">&nbsp;</td></tr><% } %>
+        </tbody>
+      </table>
+
+      <div class="tk-cuadre">
+        <span class="tk-grande">PRODUCTOS</span><span class="r tk-grande"><%= items.length %></span>
+        <span class="tk-grande">UNIDADES</span>
+        <span class="r tk-grande"><%= fmtCant(items.reduce((a, i) => a + Number(i.cantidad), 0)) %></span>
+      </div>
+
+      <% if (traslado.nota) { %>
+        <div class="tk-f3" style="margin-top:.5em"><span>Nota:</span><span></span><span class="r"><%= traslado.nota %></span></div>
+      <% } %>
+
+      <div class="c tk-pie">
+        Este documento NO es una venta. La mercancía cambia de almacén; no hay cobro.
+      </div>
+
+      <div class="tk-firmas"><div>Entrega (<%= traslado.origen_nombre %>)</div><div>Recibe (<%= traslado.destino_nombre %>)</div></div>
+    </div>
+  </div>
+
+<% if (auto) { %>
+<script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
+<% } %>
+</body>
+</html>

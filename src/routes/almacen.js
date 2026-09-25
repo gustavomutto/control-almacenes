@@ -1,10 +1,18 @@
 const express = require('express');
+const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
 const { calcularTotales, MATERIALES_M2 } = require('../lib/calculos');
 const { papelCss, fechaTexto, horaTexto } = require('../lib/impresion');
+const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
+const { movimientoDelDia, ultimosDias, movimientoExcel } = require('../lib/movimiento');
+const { inventarioExcel } = require('../lib/importar');
+const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
 
 const router = express.Router();
+
+// El archivo de Excel se lee en memoria y se descarta; nunca se guarda en el servidor.
+const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 async function cargarAlmacen(almacenId) {
   const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1', [almacenId]);
@@ -436,6 +444,212 @@ router.post('/gastos/:id/eliminar', async (req, res) => {
   const fecha = req.body.fecha || hoyISO();
   await pool.query('DELETE FROM gastos WHERE id = $1 AND almacen_id = $2', [req.params.id, almacenId]);
   res.redirect(`/almacen/caja?fecha=${fecha}&ok=` + encodeURIComponent('Gasto eliminado.'));
+});
+
+// ============ INVENTARIO POR EXCEL (descargar, llenar y volver a subir) ============
+// El personal del almacén nunca ve ni cambia el precio de costo: ni baja en el archivo
+// ni se toca al subirlo, aunque alguien le agregue esa columna a mano.
+
+router.get('/productos/excel', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const [almacen, productos] = await Promise.all([
+    cargarAlmacen(almacenId),
+    pool.query(
+      `SELECT nombre, unidad, precio_venta, existencias, controla_stock
+       FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+      [almacenId]
+    ),
+  ]);
+
+  const archivo = `inventario_${almacen.nombre.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+  res.send(inventarioExcel(productos.rows, { conCosto: false }));
+});
+
+router.post('/productos/importar', subida.single('archivo'), async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  if (!req.file) {
+    return res.redirect('/almacen/productos?error=' + encodeURIComponent('Elige el archivo de Excel.'));
+  }
+
+  let revision;
+  try {
+    revision = await revisarInventario(pool, almacenId, req.file.buffer);
+  } catch (err) {
+    return res.redirect(
+      '/almacen/productos?error=' + encodeURIComponent('No pude leer el archivo. ¿Es un Excel (.xlsx) o un CSV?')
+    );
+  }
+  if (revision.filas.length === 0) {
+    return res.redirect(
+      '/almacen/productos?error=' + encodeURIComponent(revision.errores[0] || 'El archivo no tiene productos.')
+    );
+  }
+
+  const almacen = await cargarAlmacen(almacenId);
+  res.render('almacen/importar', {
+    almacen,
+    previo: {
+      ...revision,
+      modoExistencias: req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar',
+      nombreArchivo: req.file.originalname,
+      filasFormulario: filasParaFormulario(revision.filas, false),
+    },
+    activo: 'productos',
+  });
+});
+
+router.post('/productos/importar/aplicar', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  let filas;
+  try {
+    filas = JSON.parse(req.body.filas || '[]');
+  } catch (err) {
+    return res.redirect('/almacen/productos?error=' + encodeURIComponent('Se perdió la vista previa. Sube el archivo otra vez.'));
+  }
+
+  try {
+    const { creados, actualizados } = await aplicarInventario(pool, {
+      almacenId,
+      filas,
+      modo: req.body.modo_existencias,
+      conCosto: false,
+    });
+    res.redirect(
+      '/almacen/productos?ok=' +
+        encodeURIComponent(`Listo: ${creados} producto(s) nuevo(s) y ${actualizados} actualizado(s).`)
+    );
+  } catch (err) {
+    console.error('Error importando inventario del almacén:', err);
+    res.redirect('/almacen/productos?error=' + encodeURIComponent('No se pudo guardar: ' + err.message));
+  }
+});
+
+// ============================ MOVIMIENTO DEL DÍA ============================
+// Qué material salió hoy: vendido, trasladado a otro almacén y lo que entró.
+
+router.get('/movimiento', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const fecha = req.query.fecha || hoyISO();
+  const [almacen, movimiento, dias] = await Promise.all([
+    cargarAlmacen(almacenId),
+    movimientoDelDia(pool, almacenId, fecha),
+    ultimosDias(pool, almacenId, 15),
+  ]);
+  res.render('almacen/movimiento', { almacen, movimiento, dias, fecha, hoy: hoyISO(), activo: 'movimiento' });
+});
+
+router.get('/movimiento/excel', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const fecha = req.query.fecha || hoyISO();
+  const [almacen, movimiento] = await Promise.all([
+    cargarAlmacen(almacenId),
+    movimientoDelDia(pool, almacenId, fecha),
+  ]);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="material_vendido_${fecha}.xlsx"`);
+  res.send(movimientoExcel(movimiento, { almacenNombre: almacen.nombre, fecha }));
+});
+
+router.get('/movimiento/imprimir', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const fecha = req.query.fecha || hoyISO();
+  const [almacen, movimiento] = await Promise.all([
+    cargarAlmacen(almacenId),
+    movimientoDelDia(pool, almacenId, fecha),
+  ]);
+  res.render('imprimir_movimiento', {
+    almacen,
+    movimiento,
+    fecha,
+    papelCss: papelCss(almacen.papel),
+    hora: horaTexto(),
+    fechaTexto: fechaTexto(fecha),
+    auto: req.query.auto !== '0',
+  });
+});
+
+// ============================ TRASLADOS ============================
+// Mandar mercancía a otro almacén. No es una venta: no lleva precio.
+
+router.get('/traslados', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const fecha = req.query.fecha || hoyISO();
+
+  const [almacen, destinos, productos, historial] = await Promise.all([
+    cargarAlmacen(almacenId),
+    pool.query('SELECT id, nombre FROM almacenes WHERE activo = true AND id <> $1 ORDER BY nombre', [almacenId]),
+    pool.query(
+      `SELECT id, nombre, unidad, existencias, controla_stock
+       FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+      [almacenId]
+    ),
+    listarTraslados(pool, { almacenId, limite: 60 }),
+  ]);
+
+  const proximo = await pool.query('SELECT COALESCE(MAX(numero),0) + 1 AS n FROM traslados WHERE origen_id = $1', [
+    almacenId,
+  ]);
+
+  res.render('almacen/traslados', {
+    almacen,
+    destinos: destinos.rows,
+    productos: productos.rows,
+    historial,
+    proximoNumero: proximo.rows[0].n,
+    fecha,
+    hoy: hoyISO(),
+    activo: 'traslados',
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/traslados', express.json({ limit: '256kb' }), async (req, res) => {
+  try {
+    const t = await crearTraslado(pool, {
+      origenId: req.session.usuario.almacenId,
+      destinoId: req.body.destino_id,
+      usuarioId: req.session.usuario.id,
+      cuerpo: req.body,
+    });
+    res.json({ ok: true, id: t.id, numero: t.numero, imprimir: `/almacen/traslados/imprimir/${t.id}` });
+  } catch (err) {
+    console.error('Error al trasladar:', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/traslados/:id/anular', async (req, res) => {
+  try {
+    await anularTraslado(pool, {
+      trasladoId: req.params.id,
+      almacenId: req.session.usuario.almacenId,
+      usuarioId: req.session.usuario.id,
+    });
+    res.redirect('/almacen/traslados?ok=' + encodeURIComponent('Traslado anulado; la mercancía volvió a su almacén.'));
+  } catch (err) {
+    res.redirect('/almacen/traslados?error=' + encodeURIComponent(err.message));
+  }
+});
+
+router.get('/traslados/imprimir/:id', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const datos = await cargarTraslado(pool, req.params.id, almacenId);
+  if (!datos) return res.status(404).render('404');
+
+  const almacen = await cargarAlmacen(almacenId);
+  res.render('imprimir_traslado', {
+    almacen,
+    traslado: datos.traslado,
+    items: datos.items,
+    papelCss: papelCss(almacen.papel),
+    hora: horaTexto(datos.traslado.creado_en),
+    fechaTexto: fechaTexto(datos.traslado.fecha),
+    volver: '/almacen/traslados',
+    auto: req.query.auto !== '0',
+  });
 });
 
 // ============================ DATOS DEL ALMACÉN ============================

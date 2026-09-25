@@ -1,0 +1,57 @@
+<%- include('../partials/head', { titulo: 'Subir inventario — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'productos' }) %>
+<main>
+  <div class="panel">
+    <h2>Revisa antes de guardar</h2>
+    <p class="ayuda">
+      Archivo <b><%= previo.nombreArchivo %></b> ·
+      <b><%= previo.nuevos %></b> producto(s) nuevo(s) ·
+      <b><%= previo.actualizados %></b> que ya existían y se actualizarían ·
+      existencias: <b><%= previo.modoExistencias === 'sumar' ? 'se suman a las actuales' : 'se reemplazan por las del archivo' %></b>.
+    </p>
+
+    <% if (previo.errores.length > 0) { %>
+      <div class="aviso-caja">
+        <b>Avisos del archivo:</b>
+        <ul style="margin:8px 0 0 18px">
+          <% previo.errores.slice(0, 10).forEach(e => { %><li><%= e %></li><% }) %>
+        </ul>
+      </div>
+    <% } %>
+
+    <table class="tabla">
+      <thead>
+        <tr><th>Producto</th><th>Unidad</th><th class="n">Precio venta</th><th class="n">Existencias</th><th>Qué pasa</th></tr>
+      </thead>
+      <tbody>
+        <% previo.filas.slice(0, 200).forEach(f => { %>
+          <tr>
+            <td><%= f.nombre %></td>
+            <td><%= f.unidad %></td>
+            <td class="n"><%= fmt(f.precio_venta) %></td>
+            <td class="n"><%= fmtCant(f.existencias) %></td>
+            <td>
+              <% if (f.accion === 'crear') { %>
+                <span class="chip almacen">nuevo</span>
+              <% } else { %>
+                actualiza (antes: <%= fmt(f.actual.precio_venta) %>, <%= fmtCant(f.actual.existencias) %> und.)
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% if (previo.filas.length > 200) { %>
+      <p class="ayuda" style="margin-top:10px">Se muestran los primeros 200 de <%= previo.filas.length %>. Se guardarán todos.</p>
+    <% } %>
+
+    <form method="post" action="/almacen/productos/importar/aplicar" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+      <input type="hidden" name="modo_existencias" value="<%= previo.modoExistencias %>">
+      <input type="hidden" name="filas" value="<%= JSON.stringify(previo.filasFormulario) %>">
+      <button class="btn cobrar" type="submit">Guardar <%= previo.filas.length %> producto(s)</button>
+      <a class="btn linea" href="/almacen/productos">Cancelar</a>
+    </form>
+  </div>
+</main>
+</body>
+</html>

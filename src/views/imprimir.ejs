@@ -22,7 +22,11 @@
   </div>
 
   <div id="print-area">
-    <%- include('partials/ticket', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
+    <% if (almacen.papel === 'carta') { %>
+      <%- include('partials/factura', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
+    <% } else { %>
+      <%- include('partials/ticket', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
+    <% } %>
   </div>
 
 <% if (auto) { %>

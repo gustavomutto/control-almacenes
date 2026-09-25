@@ -63,6 +63,9 @@ table.tabla tfoot td{font-weight:700;border-top:2px solid var(--line);border-bot
 
 .chip{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:10px}
 .chip.almacen{color:var(--blue);background:var(--blue-soft)}
+.chip.envio{color:#6B4700;background:#FDF0D2}
+.chip.recibo{color:var(--green);background:#E4F3EA}
+.ayuda.alerta{color:var(--red);font-weight:600}
 
 .mensaje{padding:10px 14px;border-radius:5px;margin-bottom:16px;font-weight:600}
 .mensaje.ok{background:#E4F3EA;color:var(--green)}

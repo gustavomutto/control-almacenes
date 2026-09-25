@@ -137,6 +137,52 @@ CREATE TABLE IF NOT EXISTS movimientos_inventario (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ============================================================
+-- Traslados de mercancía entre almacenes
+-- ============================================================
+-- No son ventas: no llevan precio ni ganancia. Facturar a cero pesos sería peor,
+-- porque el almacén que envía se comería el costo de la mercancía como pérdida.
+-- Al guardar, la mercancía sale del inventario de origen y entra al de destino.
+-- El costo viaja con el producto, para que la ganancia del que recibe salga bien.
+CREATE TABLE IF NOT EXISTS traslados (
+  id SERIAL PRIMARY KEY,
+  numero INTEGER NOT NULL,
+  origen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
+  destino_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
+  fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+  responsable TEXT NOT NULL DEFAULT '',
+  nota TEXT NOT NULL DEFAULT '',
+  anulado BOOLEAN NOT NULL DEFAULT false,
+  registrado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT traslado_entre_almacenes_distintos CHECK (origen_id <> destino_id),
+  UNIQUE (origen_id, numero)
+);
+
+CREATE TABLE IF NOT EXISTS traslado_items (
+  id SERIAL PRIMARY KEY,
+  traslado_id INTEGER NOT NULL REFERENCES traslados(id) ON DELETE CASCADE,
+  producto_id INTEGER REFERENCES productos(id) ON DELETE SET NULL,
+  destino_producto_id INTEGER REFERENCES productos(id) ON DELETE SET NULL,
+  descripcion TEXT NOT NULL,
+  unidad TEXT NOT NULL DEFAULT 'unidad',
+  cantidad NUMERIC(14,3) NOT NULL,
+  -- Solo para que el costo llegue al almacén de destino. Nunca se le muestra al personal.
+  costo_unit NUMERIC(14,2) NOT NULL DEFAULT 0
+);
+
+-- Un movimiento de inventario ahora también puede venir de un traslado.
+ALTER TABLE movimientos_inventario DROP CONSTRAINT IF EXISTS movimientos_inventario_tipo_check;
+ALTER TABLE movimientos_inventario ADD CONSTRAINT movimientos_inventario_tipo_check
+  CHECK (tipo IN ('entrada','venta','ajuste','anulacion','traslado'));
+ALTER TABLE movimientos_inventario ADD COLUMN IF NOT EXISTS traslado_id INTEGER
+  REFERENCES traslados(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_traslados_origen_fecha ON traslados (origen_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_traslados_destino_fecha ON traslados (destino_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_traslado_items_traslado ON traslado_items (traslado_id);
+CREATE INDEX IF NOT EXISTS idx_movimientos_producto_fecha ON movimientos_inventario (producto_id, creado_en);
+
 CREATE INDEX IF NOT EXISTS idx_gastos_almacen_fecha ON gastos (almacen_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_almacenes_region ON almacenes (region_id);
 CREATE INDEX IF NOT EXISTS idx_productos_almacen ON productos (almacen_id);

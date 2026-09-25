@@ -1,0 +1,62 @@
+<%- include('../partials/head', { titulo: 'Traslados — ' + almacen.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'traslados' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <% if (destinos.length === 0) { %>
+    <div class="panel"><p class="vacio">No hay otro almacén al cual trasladar mercancía todavía.</p></div>
+  <% } else { %>
+    <%- include('../partials/traslado_form', { destinos, hoy, origenNombre: almacen.nombre }) %>
+  <% } %>
+
+  <div class="panel">
+    <h3>Hojas de traslado</h3>
+    <p class="ayuda">Lo que has enviado y lo que te ha llegado de otros almacenes.</p>
+    <table class="tabla">
+      <thead>
+        <tr><th>N°</th><th>Fecha</th><th></th><th>Almacén</th><th class="n">Productos</th><th class="n">Unidades</th><th>Quién llevó</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% historial.forEach(t => { %>
+          <% const enviado = t.origen_id === almacen.id; %>
+          <tr<%= t.anulado ? ' class="anulada"' : '' %>>
+            <td><%= t.numero %></td>
+            <td><%= fechaISO(t.fecha) %></td>
+            <td><span class="chip <%= enviado ? 'envio' : 'recibo' %>"><%= enviado ? 'enviado' : 'recibido' %></span></td>
+            <td><%= enviado ? t.destino_nombre : t.origen_nombre %></td>
+            <td class="n"><%= t.lineas %></td>
+            <td class="n"><%= fmtCant(t.unidades) %></td>
+            <td><%= t.responsable || '—' %></td>
+            <td class="n">
+              <a class="btn linea mini" href="/almacen/traslados/imprimir/<%= t.id %>?auto=0">Ver hoja</a>
+              <% if (enviado && !t.anulado) { %>
+                <form method="post" action="/almacen/traslados/<%= t.id %>/anular" style="display:inline"
+                      onsubmit="return confirm('¿Anular este traslado? La mercancía vuelve a este almacén.')">
+                  <button class="btn peligro mini" type="submit">Anular</button>
+                </form>
+              <% } %>
+              <% if (t.anulado) { %><span class="chip">anulado</span><% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (historial.length === 0) { %>
+          <tr><td colspan="8" class="vacio">Todavía no hay traslados.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<% if (destinos.length > 0) { %>
+<script>
+window.APP = {
+  productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
+  origenFijo: <%= almacen.id %>,
+  endpoint: '/almacen/traslados'
+};
+</script>
+<script src="/js/traslado.js?v=<%= v %>"></script>
+<% } %>
+</body>
+</html>

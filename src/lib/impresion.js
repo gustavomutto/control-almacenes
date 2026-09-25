@@ -2,7 +2,11 @@
 const PAPELES = {
   '58mm': '@page{margin:0} #print-area .tk{width:54mm;padding:2mm;font-size:9px}',
   '80mm': '@page{margin:0} #print-area .tk{width:74mm;padding:3mm;font-size:11px}',
-  carta: '@page{size:letter;margin:12mm} #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
+  // En carta, la factura usa el ancho útil de la hoja (.fx); los documentos que siguen
+  // con el formato de tirilla (.tk) van centrados a 125mm.
+  carta:
+    '@page{size:letter;margin:14mm} #print-area .fx{width:100%;font-size:12.5px}' +
+    ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
 
 function papelCss(papel) {
@@ -19,7 +23,7 @@ function papelCss(papel) {
 function anchoPantalla(papel) {
   if (papel === '58mm') return '54mm';
   if (papel === '80mm') return '74mm';
-  return '125mm';
+  return '188mm'; // hoja carta menos los márgenes
 }
 
 const MESES = [
