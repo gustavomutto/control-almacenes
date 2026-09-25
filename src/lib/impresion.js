@@ -1,36 +1,48 @@
 // Reglas de papel para imprimir: media carta, hoja carta o ticket térmico POS (58/80mm).
 //
-// La factura SIEMPRE cabe en 22 cm de ancho por 14 cm de alto:
-//   · 3 cm para los datos del almacén (encabezado)
-//   · 11 cm para los productos, la forma de pago y el total
-// Es media hoja carta. Quien tenga la impresora cargada con media carta usa «media»;
-// quien imprima en hoja carta completa usa «carta» y corta por la línea punteada.
-// 22 x 14 cm menos los márgenes. Al imprimir se usa min-height: si algún día una factura
-// trae tantos productos que no caben ni con la letra más apretada, preferimos que siga en
-// otra media hoja antes que recortar un producto sin avisar.
-const CAJA = 'width:204mm;min-height:130mm';
-const CAJA_PANTALLA = 'width:204mm;height:130mm;overflow:hidden';
+// MEDIA CARTA es el papel que de verdad está cargado en la Ricoh: 8,5 × 6,5 pulgadas
+// (21,6 × 16,5 cm). Se le pide a Chrome exactamente en pulgadas, con el mismo número que
+// tiene el formulario del driver, para que lo reconozca y no intente reescalar.
+//
+// El contenido de la factura sigue armado para 22 × 14 cm (3 cm de encabezado y 11 cm de
+// productos, pago y total): entra en la hoja con 2,5 cm de sobra abajo, que es justo el
+// margen de seguridad para que nunca se salga nada.
+const ALTO_CONTENIDO = '130mm'; // los 14 cm del contenido menos los márgenes
+
+// Al imprimir el ancho lo pone la hoja (los márgenes los maneja @page), no un número fijo.
+const CAJA_IMPRESION = `width:100%;min-height:${ALTO_CONTENIDO}`;
 
 const PAPELES = {
   '58mm': '@page{margin:0} #print-area .tk{width:54mm;padding:2mm;font-size:9px}',
   '80mm': '@page{margin:0} #print-area .tk{width:74mm;padding:3mm;font-size:11px}',
-  // Media carta de verdad: la hoja mide 22 x 14 cm.
-  media: `@page{size:216mm 140mm;margin:5mm 6mm} #print-area .fx{${CAJA}}` +
+  // Media carta: la hoja mide 8,5 x 6,5 pulgadas.
+  media:
+    `@page{size:8.5in 6.5in;margin:6mm 7mm} #print-area .fx{${CAJA_IMPRESION}}` +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:11px}',
-  // Hoja carta completa: la factura ocupa la mitad de arriba y se corta.
-  carta: `@page{size:letter;margin:6mm 6mm} #print-area .fx{${CAJA};border-bottom:1px dashed #999;padding-bottom:4mm}` +
+  // Hoja carta completa: la factura ocupa la parte de arriba y se corta por la línea punteada.
+  carta:
+    `@page{size:letter;margin:6mm 7mm} #print-area .fx{${CAJA_IMPRESION};` +
+    'border-bottom:1px dashed #999;padding-bottom:4mm}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
 
+// Alto de la hoja en pantalla (la vista previa se ve del tamaño del papel real).
+const ALTO_PANTALLA = { media: '165mm', carta: '140mm' };
+
 function papelCss(papel) {
   const regla = PAPELES[papel] || PAPELES.carta;
-  // En pantalla mostramos el documento con el ancho real del papel, para que lo que
-  // se ve sea igual a lo que sale por la impresora.
   const esTicket = papel === '58mm' || papel === '80mm';
+
+  // En pantalla mostramos el documento con el tamaño real del papel, para que lo que
+  // se ve sea igual a lo que sale por la impresora.
+  const alto = ALTO_PANTALLA[papel] || ALTO_PANTALLA.carta;
   const pantalla =
     `@media screen{#print-area{width:${anchoPantalla(papel)};max-width:100%;` +
-    `padding:${esTicket ? '4mm 3mm' : '5mm 6mm'}}}` +
-    (esTicket ? '' : `@media screen{#print-area .fx{${CAJA_PANTALLA}}}`);
+    `padding:${esTicket ? '4mm 3mm' : '6mm 7mm'}}}` +
+    (esTicket
+      ? ''
+      : `@media screen{#print-area .fx{width:100%;height:calc(${alto} - 12mm);overflow:hidden}}`);
+
   return pantalla + '@media print{' + regla + '}';
 }
 
@@ -41,8 +53,8 @@ function anchoPantalla(papel) {
   return '216mm';
 }
 
-// La factura no puede crecer más allá de 14 cm, así que entre más productos, más
-// apretada la letra. Con esto caben hasta unas 24 líneas en la media hoja.
+// La factura no puede crecer más allá de la hoja, así que entre más productos, más
+// apretada la letra. Con esto caben unas 26 líneas en la media hoja.
 function densidadFactura(lineas) {
   const n = Number(lineas) || 0;
   if (n <= 6) return '';
@@ -58,7 +70,7 @@ function papelEfectivo(usuario, almacen) {
 }
 
 const NOMBRES_PAPEL = {
-  media: 'media carta (22 × 14 cm)',
+  media: 'media carta (8,5 × 6,5 pulgadas)',
   carta: 'hoja carta (se corta a la mitad)',
   '80mm': 'ticket 80mm',
   '58mm': 'ticket 58mm',
@@ -82,6 +94,7 @@ function horaTexto(fechaHora) {
 module.exports = {
   PAPELES,
   NOMBRES_PAPEL,
+  ALTO_PANTALLA,
   papelCss,
   anchoPantalla,
   densidadFactura,

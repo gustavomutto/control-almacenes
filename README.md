@@ -90,17 +90,21 @@ cualquier día). Como la ve el personal, ahí no aparece el costo ni la ganancia
 
 ## Impresión
 
-La factura **siempre cabe en 22 × 14 cm** (media hoja carta): 3 cm para los datos del almacén y
-11 cm para los productos, la forma de pago y el total. Si hay muchos productos la letra se aprieta
-sola —de 12 px hasta 7,5 px— para que quepan hasta unas 26 líneas sin recortar nada; si alguna vez
-no cupieran, sigue en otra media hoja antes que cortar un producto.
+La factura se arma **siempre dentro de 22 × 14 cm**: 3 cm para los datos del almacén y 11 cm para
+los productos, la forma de pago y el total. Si hay muchos productos la letra se aprieta sola —de
+12 px hasta 7,5 px— para que quepan hasta unas 26 líneas sin recortar nada.
+
+La hoja de **media carta** se le pide a la impresora en pulgadas exactas, **8,5 × 6,5 pulgadas**
+(21,6 × 16,5 cm), que es la medida del formulario del driver de la Ricoh. Eso importa: si el tamaño
+que pide el sistema no existe igualito en el driver, Chrome usa otro y lo reescala, y la impresora
+reclama el formato. El contenido de 14 cm entra en esa hoja con 2,5 cm de sobra abajo.
 
 Cada almacén (y cada caja) se configura desde «Almacenes y usuarios»:
 
 | Papel | Para qué |
 |---|---|
-| **Media carta (22 × 14 cm)** | La impresora tiene media carta cargada. La hoja es de 22 × 14 cm. |
-| **Hoja carta (se corta)** | Se imprime en carta completa; la factura ocupa la mitad de arriba y hay una línea punteada por dónde cortar. |
+| **Media carta (8,5 × 6,5 pulgadas)** | La impresora tiene media carta cargada (21,6 × 16,5 cm). |
+| **Hoja carta (se corta)** | Se imprime en carta completa; la factura ocupa la parte de arriba y hay una línea punteada por dónde cortar. |
 | **Ticket POS 80mm / 58mm** | Impresora térmica de tirilla, con el formato de siempre. |
 
 La factura lleva arriba el negocio (nombre, dirección, teléfono y NIT) y al frente el tipo de
@@ -112,7 +116,13 @@ La **forma de pago** sale sola: con un solo método dice «Efectivo» o «Transf
 dice **«Mixto»** y debajo el desglose de cada uno y el cambio. Los métodos de la lista los define
 cada almacén en «Mis datos».
 
-La vista previa de la pantalla de venta muestra la media hoja tal como va a salir.
+La vista previa de la pantalla de venta muestra la hoja tal como va a salir, con su tamaño real.
+
+En el PC de la caja: el formulario de papel del driver debe medir 8,5 × 6,5 pulgadas y, después de
+crearlo, hay que **cerrar y volver a abrir Chrome** (lee los tamaños de la impresora una sola vez y
+los deja en caché). En la ventana de impresión: escala 100 % —nunca «ajustar al área de impresión»—
+y encabezados y pies de página apagados. Para imprimir sin ninguna ventana, un acceso directo a
+Chrome con `--kiosk-printing` manda el trabajo derecho a la impresora predeterminada.
 
 Hoy:
 

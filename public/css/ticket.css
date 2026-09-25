@@ -107,8 +107,9 @@
 .fx-nota{font-size:.88em;color:#333;padding-top:.5em}
 
 /* La vista previa de la hoja carta se muestra encogida, para que quepa al lado de la venta. */
-.papel-carta{--esc:.62;padding:0;position:relative;overflow:hidden;max-width:100%;
-  width:calc(216mm * var(--esc));height:calc(140mm * var(--esc))}
-.papel-carta .fx{position:absolute;top:0;left:0;width:204mm;height:130mm;padding:5mm 6mm;background:#fff;
-  transform:scale(var(--esc));transform-origin:top left}
+.papel-carta{--esc:.62;--alto:140mm;padding:0;position:relative;overflow:hidden;max-width:100%;
+  width:calc(216mm * var(--esc));height:calc(var(--alto) * var(--esc))}
+.papel-carta.papel-media{--alto:165mm}
+.papel-carta .fx{position:absolute;top:0;left:0;width:202mm;height:calc(var(--alto) - 12mm);
+  padding:6mm 7mm;background:#fff;transform:scale(var(--esc));transform-origin:top left}
 @media (max-width:620px){.papel-carta{--esc:.42}}

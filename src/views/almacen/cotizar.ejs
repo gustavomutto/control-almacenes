@@ -43,7 +43,7 @@
 
     <aside class="papel-wrap">
       <p class="papel-titulo">Así saldrá impresa — <%= papelNombre %></p>
-      <div class="papel <%= almacen.papel === 'carta' || almacen.papel === 'media' ? 'papel-carta' : '' %>" id="previewFactura"></div>
+      <div class="papel <%= almacen.papel === 'carta' || almacen.papel === 'media' ? 'papel-carta' : '' %><%= almacen.papel === 'media' ? ' papel-media' : '' %>" id="previewFactura"></div>
     </aside>
   </div>
 </main>
