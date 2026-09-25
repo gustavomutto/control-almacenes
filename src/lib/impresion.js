@@ -7,22 +7,36 @@
 // El contenido de la factura sigue armado para 22 × 14 cm (3 cm de encabezado y 11 cm de
 // productos, pago y total): entra en la hoja con 2,5 cm de sobra abajo, que es justo el
 // margen de seguridad para que nunca se salga nada.
-const ALTO_CONTENIDO = '130mm'; // los 14 cm del contenido menos los márgenes
+// Alto FIJO del bloque al imprimir, siempre algo menor que el área útil de la hoja.
+// Va fijo a propósito: con min-height, un milímetro de más empujaba una segunda hoja en
+// blanco y la impresora la reportaba como atasco. Si el contenido no cupiera, un script
+// en la página de impresión encoge la letra hasta que quepa, en vez de saltar de hoja.
+const ALTO_IMPRESION = { media: '150mm', carta: '130mm' };
 
-// Al imprimir el ancho lo pone la hoja (los márgenes los maneja @page), no un número fijo.
-const CAJA_IMPRESION = `width:100%;min-height:${ALTO_CONTENIDO}`;
+function cajaImpresion(papel) {
+  return (
+    `width:100%;height:${ALTO_IMPRESION[papel]};overflow:hidden;` +
+    'break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid'
+  );
+}
+
+// Nada puede empujar una segunda hoja.
+const UNA_SOLA_HOJA =
+  'html,body{margin:0!important;padding:0!important;height:auto!important}' +
+  ' #print-area{margin:0!important;padding:0!important;overflow:hidden!important;' +
+  'break-after:avoid!important;page-break-after:avoid!important}';
 
 const PAPELES = {
   '58mm': '@page{margin:0} #print-area .tk{width:54mm;padding:2mm;font-size:9px}',
   '80mm': '@page{margin:0} #print-area .tk{width:74mm;padding:3mm;font-size:11px}',
   // Media carta: la hoja mide 8,5 x 6,5 pulgadas.
   media:
-    `@page{size:8.5in 6.5in;margin:6mm 7mm} #print-area .fx{${CAJA_IMPRESION}}` +
+    `@page{size:8.5in 6.5in;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:11px}',
   // Hoja carta completa: la factura ocupa la parte de arriba y se corta por la línea punteada.
   carta:
-    `@page{size:letter;margin:6mm 7mm} #print-area .fx{${CAJA_IMPRESION};` +
-    'border-bottom:1px dashed #999;padding-bottom:4mm}' +
+    `@page{size:letter;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
+    'border-bottom:1px dashed #999}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
 
@@ -35,13 +49,12 @@ function papelCss(papel) {
 
   // En pantalla mostramos el documento con el tamaño real del papel, para que lo que
   // se ve sea igual a lo que sale por la impresora.
-  const alto = ALTO_PANTALLA[papel] || ALTO_PANTALLA.carta;
   const pantalla =
     `@media screen{#print-area{width:${anchoPantalla(papel)};max-width:100%;` +
-    `padding:${esTicket ? '4mm 3mm' : '6mm 7mm'}}}` +
+    `padding:${esTicket ? '4mm 3mm' : '5mm 7mm'}}}` +
     (esTicket
       ? ''
-      : `@media screen{#print-area .fx{width:100%;height:calc(${alto} - 12mm);overflow:hidden}}`);
+      : `@media screen{#print-area .fx{width:100%;height:${ALTO_IMPRESION[papel] || ALTO_IMPRESION.carta};overflow:hidden}}`);
 
   return pantalla + '@media print{' + regla + '}';
 }
@@ -93,6 +106,7 @@ function horaTexto(fechaHora) {
 
 module.exports = {
   PAPELES,
+  ALTO_IMPRESION,
   NOMBRES_PAPEL,
   ALTO_PANTALLA,
   papelCss,

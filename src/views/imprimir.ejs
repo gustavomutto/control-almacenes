@@ -29,6 +29,20 @@
     <% } %>
   </div>
 
+<script>
+// Red de seguridad: si por alguna razón el contenido no cupiera en la hoja, se encoge la
+// letra hasta que quepa. Antes el sobrante empujaba una segunda hoja casi en blanco y la
+// impresora la reportaba como atasco.
+(function ajustarAlaHoja() {
+  var fx = document.querySelector('#print-area .fx');
+  if (!fx) return;
+  var tam = parseFloat(getComputedStyle(fx).fontSize);
+  for (var i = 0; i < 40 && fx.scrollHeight > fx.clientHeight + 1 && tam > 5; i++) {
+    tam -= 0.25;
+    fx.style.fontSize = tam + 'px';
+  }
+})();
+</script>
 <% if (auto) { %>
 <script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
 <% } %>

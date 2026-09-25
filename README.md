@@ -118,6 +118,11 @@ cada almacén en «Mis datos».
 
 La vista previa de la pantalla de venta muestra la hoja tal como va a salir, con su tamaño real.
 
+La factura se imprime **siempre en una sola hoja**: el bloque tiene un alto fijo menor que el área
+útil del papel y, si el contenido no cupiera, un script encoge la letra hasta que quepa en vez de
+saltar a otra hoja. Antes, un milímetro de sobra empujaba una segunda hoja casi en blanco y la
+impresora la reportaba como atasco. Probado de 1 a 40 productos: una hoja, sin cortar nada.
+
 En el PC de la caja: el formulario de papel del driver debe medir 8,5 × 6,5 pulgadas y, después de
 crearlo, hay que **cerrar y volver a abrir Chrome** (lee los tamaños de la impresora una sola vez y
 los deja en caché). En la ventana de impresión: escala 100 % —nunca «ajustar al área de impresión»—
