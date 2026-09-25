@@ -1,6 +1,6 @@
 <%- include('../partials/head', { titulo: 'Facturar — ' + almacen.nombre }) %>
 <%- include('../partials/barra', { usuario, activo: 'facturar' }) %>
-<main>
+<main class="ancho">
   <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
   <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
 

@@ -71,7 +71,9 @@ Cada almacén se configura en hoja carta o en ticket POS térmico (80mm o 58mm) 
 - **Hoja carta**: una factura normal, pensada para leerse. Arriba el negocio (nombre, dirección,
   teléfono y NIT) y al frente el tipo de documento, el número, la fecha y la hora; después el
   cliente y quién atendió; la tabla de productos con cantidad, valor unitario y valor total; los
-  totales a la derecha y la forma de pago a la izquierda; la nota del almacén y las dos firmas.
+  totales a la derecha y la forma de pago a la izquierda; la nota del almacén y, al cerrar, la
+  línea para la firma y el sello del vendedor con un mensaje corto al frente («¡Gracias por su
+  compra! Conserve esta factura como comprobante…»). No lleva firma del cliente.
   Sin cuadrícula: solo líneas finas que separan los bloques.
 - **Ticket POS (80mm / 58mm)**: el formato de tirilla de siempre, sin cambios.
 
@@ -80,8 +82,9 @@ La **forma de pago** sale sola: si el cliente paga con un solo método dice «Ef
 uno (y el cambio, si lo hubo). Los métodos que aparecen en la lista los define cada almacén en
 «Mis datos».
 
-La vista previa de la pantalla de venta muestra el documento tal como va a salir, incluida la hoja
-carta a escala.
+La vista previa de la pantalla de venta muestra el documento tal como va a salir. La hoja carta se
+ve en grande, a escala de la página real, y la pantalla de venta se ensancha para que quepan las
+dos cosas sin apretar nada.
 
 Hoy:
 

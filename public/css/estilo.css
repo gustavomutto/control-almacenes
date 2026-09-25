@@ -22,6 +22,8 @@ a{color:var(--blue)}
 .btn-salir{background:none;border:1px solid #475562;color:#fff;padding:7px 12px;border-radius:5px;cursor:pointer;font-weight:600;font-size:13px}
 
 main{max-width:1100px;margin:0 auto;padding:20px}
+/* La pantalla de venta necesita más ancho: a la derecha va la hoja tamaño carta. */
+main.ancho{max-width:1520px}
 
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px 22px;margin-bottom:20px}
 .panel h2{font-family:var(--fc);font-size:24px;margin:0 0 4px}
@@ -86,7 +88,7 @@ table.tabla tfoot td{font-weight:700;border-top:2px solid var(--line);border-bot
 }
 
 /* ===================== Punto de venta ===================== */
-.vista-pos{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+.vista-pos{display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:24px;align-items:start}
 .trabajo{background:var(--panel);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;min-height:calc(100vh - 120px)}
 
 .buscador{position:relative;padding:18px 20px 6px}
@@ -139,7 +141,7 @@ tr.anulada td{opacity:.55;text-decoration:line-through}
 
 @media (max-width:1100px){
   .vista-pos{grid-template-columns:minmax(0,1fr)}
-  .papel-wrap{position:static;max-width:420px;margin:0 auto;width:100%}
+  .papel-wrap{position:static;max-width:560px;margin:0 auto;width:100%}
   .trabajo{min-height:0}
   .campos-venta,.m2{grid-template-columns:1fr}
 }

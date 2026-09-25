@@ -219,7 +219,10 @@
           </div>
         </div>
         ${a.nota ? `<div class="fx-nota">${esc(a.nota)}</div>` : ''}
-        <div class="fx-firmas"><div>Elaborado por</div><div>Aceptado por el cliente</div></div>
+        <div class="fx-cierre">
+          <div class="fx-firma">Elaborado por</div>
+          <p class="fx-mensaje">Cotización válida por 15 días.<br>Los precios pueden variar según la disponibilidad del material.</p>
+        </div>
       </div>`;
       return;
     }

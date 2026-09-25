@@ -89,8 +89,16 @@
     <div class="fx-nota"><%= almacen.nota %></div>
   <% } %>
 
-  <div class="fx-firmas">
-    <div><%= esFactura ? 'Firma del vendedor' : 'Elaborado por' %></div>
-    <div><%= esFactura ? 'Recibí conforme' : 'Aceptado por el cliente' %></div>
+  <div class="fx-cierre">
+    <div class="fx-firma"><%= esFactura ? 'Firma y sello' : 'Elaborado por' %></div>
+    <p class="fx-mensaje">
+      <% if (esFactura) { %>
+        ¡Gracias por su compra!<br>
+        Conserve esta factura como comprobante para cualquier cambio o garantía.
+      <% } else { %>
+        Cotización válida por 15 días.<br>
+        Los precios pueden variar según la disponibilidad del material.
+      <% } %>
+    </p>
   </div>
 </div>
