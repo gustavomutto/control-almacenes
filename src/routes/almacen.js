@@ -3,7 +3,14 @@ const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
 const { calcularTotales, MATERIALES_M2 } = require('../lib/calculos');
-const { papelCss, fechaTexto, horaTexto } = require('../lib/impresion');
+const {
+  papelCss,
+  fechaTexto,
+  horaTexto,
+  papelEfectivo,
+  densidadFactura,
+  NOMBRES_PAPEL,
+} = require('../lib/impresion');
 const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
 const { movimientoDelDia, ultimosDias, movimientoExcel } = require('../lib/movimiento');
 const { inventarioExcel } = require('../lib/importar');
@@ -42,8 +49,12 @@ router.get('/', async (req, res) => {
     [almacenId]
   );
 
+  // La vista previa debe verse en el papel de ESTA caja.
+  almacen.papel = papelEfectivo(req.session.usuario, almacen);
+
   res.render('almacen/facturar', {
     almacen,
+    papelNombre: NOMBRES_PAPEL[almacen.papel] || almacen.papel,
     productos: productos.rows,
     proximoNumero: proximo.rows[0].n,
     ultima: ultima.rows[0] || null,
@@ -204,8 +215,11 @@ router.get('/cotizar', async (req, res) => {
     ),
   ]);
 
+  almacen.papel = papelEfectivo(req.session.usuario, almacen);
+
   res.render('almacen/cotizar', {
     almacen,
+    papelNombre: NOMBRES_PAPEL[almacen.papel] || almacen.papel,
     productos: productos.rows,
     materialesM2: MATERIALES_M2,
     activo: 'cotizar',
@@ -643,7 +657,7 @@ router.get('/movimiento/imprimir', async (req, res) => {
     almacen,
     movimiento,
     fecha,
-    papelCss: papelCss(almacen.papel),
+    papelCss: papelCss(papelEfectivo(req.session.usuario, almacen)),
     hora: horaTexto(),
     fechaTexto: fechaTexto(fecha),
     auto: req.query.auto !== '0',
@@ -724,7 +738,7 @@ router.get('/traslados/imprimir/:id', async (req, res) => {
     almacen,
     traslado: datos.traslado,
     items: datos.items,
-    papelCss: papelCss(almacen.papel),
+    papelCss: papelCss(papelEfectivo(req.session.usuario, almacen)),
     hora: horaTexto(datos.traslado.creado_en),
     fechaTexto: fechaTexto(datos.traslado.fecha),
     volver: '/almacen/traslados',
@@ -777,13 +791,18 @@ router.get('/imprimir/:id', async (req, res) => {
     nota: doc.nota,
     papel: doc.papel,
   };
+  // Cada caja puede tener su propia impresora y su propio papel.
+  const papel = papelEfectivo(req.session.usuario, almacen);
 
   res.render('imprimir', {
     almacen,
     doc,
     items,
     pagos,
-    papelCss: papelCss(doc.papel),
+    papel,
+    papelNombre: NOMBRES_PAPEL[papel] || papel,
+    densidad: densidadFactura(items.length),
+    papelCss: papelCss(papel),
     hora: horaTexto(doc.creado_en),
     fechaTexto: fechaTexto(doc.fecha),
     volver: doc.tipo === 'factura' ? '/almacen' : '/almacen/cotizar',
@@ -799,7 +818,7 @@ router.get('/caja/imprimir', async (req, res) => {
     almacen,
     resumen,
     fecha,
-    papelCss: papelCss(almacen.papel),
+    papelCss: papelCss(papelEfectivo(req.session.usuario, almacen)),
     hora: horaTexto(),
     fechaTexto: fechaTexto(fecha),
     auto: req.query.auto !== '0',

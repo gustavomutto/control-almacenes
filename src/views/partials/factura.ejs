@@ -1,11 +1,12 @@
 <%
-  // Factura en hoja carta: la información, sin la cuadrícula.
+  // Factura de media carta: 22 x 14 cm. 3 cm de encabezado y 11 cm para el resto.
+  // `densidad` aprieta la letra cuando hay muchos productos, para que nunca se salga de la hoja.
   const esFactura = doc.tipo === 'factura';
   const pagados = (pagos || []).filter((p) => Number(p.valor) > 0);
   const formaPago = !esFactura ? '' : pagados.length === 0 ? 'Sin registrar'
     : pagados.length === 1 ? pagados[0].metodo : 'Mixto';
 %>
-<div class="fx">
+<div class="fx <%= densidad %>">
   <div class="fx-cab">
     <div class="fx-negocio">
       <strong><%= almacen.encabezado || almacen.nombre %></strong>
@@ -19,86 +20,85 @@
     <div class="fx-doc">
       <div class="fx-tipo"><%= esFactura ? 'Factura de venta' : 'Cotización' %></div>
       <div class="fx-num">N° <%= doc.numero %></div>
-      <div><%= fechaTexto %></div>
-      <div><%= hora %></div>
+      <div><%= fechaTexto %> · <%= hora %></div>
     </div>
   </div>
 
   <div class="fx-cliente">
     <div><span>Cliente:</span><b><%= doc.cliente || 'Consumidor final' %></b></div>
     <% if (doc.m2) { %><div><span>Área:</span><b><%= fmtCant(doc.m2) %> m²</b></div><% } %>
-    <% if (doc.vendedor) { %><div><span>Atendió:</span><b><%= doc.vendedor %></b></div><% } %>
+    <% if (doc.vendedor) { %><div><span>Lo atendió:</span><b><%= doc.vendedor %></b></div><% } %>
     <% if (doc.anulada) { %><div><b>*** ANULADA ***</b></div><% } %>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Producto</th>
-        <th style="width:12%">Cantidad</th>
-        <th style="width:18%">V. unitario</th>
-        <th style="width:18%">V. total</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% items.forEach(i => { %>
+  <div class="fx-cuerpo">
+    <table>
+      <thead>
         <tr>
-          <td>
-            <%= i.descripcion %>
-            <% if (i.detalle) { %><small><%= i.detalle %></small><% } %>
-          </td>
-          <td><%= fmtCant(i.cantidad) %></td>
-          <td><%= fmt(i.precio_unit) %></td>
-          <td><%= fmt(i.total) %></td>
+          <th>Producto</th>
+          <th style="width:12%">Cantidad</th>
+          <th style="width:18%">V. unitario</th>
+          <th style="width:18%">V. total</th>
         </tr>
-      <% }) %>
-      <% if (items.length === 0) { %><tr><td colspan="4">&nbsp;</td></tr><% } %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <% items.forEach(i => { %>
+          <tr>
+            <td>
+              <%= i.descripcion %>
+              <% if (i.detalle) { %><small><%= i.detalle %></small><% } %>
+            </td>
+            <td><%= fmtCant(i.cantidad) %></td>
+            <td><%= fmt(i.precio_unit) %></td>
+            <td><%= fmt(i.total) %></td>
+          </tr>
+        <% }) %>
+        <% if (items.length === 0) { %><tr><td colspan="4">&nbsp;</td></tr><% } %>
+      </tbody>
+    </table>
 
-  <div class="fx-resumen">
-    <div class="fx-pago">
-      <% if (esFactura) { %>
-        <div class="fx-rotulo">Forma de pago</div>
-        <b><%= formaPago %></b>
-        <% if (pagados.length > 1 || Number(doc.cambio)) { %>
-          <div class="fx-detalle">
-            <% pagados.forEach(p => { %>
-              <span><%= p.metodo %></span><span><%= fmt(p.valor) %></span>
-            <% }) %>
-            <% if (Number(doc.cambio)) { %><span>Cambio</span><span><%= fmt(doc.cambio) %></span><% } %>
-          </div>
+    <div class="fx-resumen">
+      <div class="fx-pago">
+        <% if (esFactura) { %>
+          <div class="fx-rotulo">Forma de pago</div>
+          <b><%= formaPago %></b>
+          <% if (pagados.length > 1 || Number(doc.cambio)) { %>
+            <div class="fx-detalle">
+              <% pagados.forEach(p => { %>
+                <span><%= p.metodo %></span><span><%= fmt(p.valor) %></span>
+              <% }) %>
+              <% if (Number(doc.cambio)) { %><span>Cambio</span><span><%= fmt(doc.cambio) %></span><% } %>
+            </div>
+          <% } %>
+        <% } else { %>
+          <div class="fx-rotulo">Validez</div>
+          <b>15 días</b>
         <% } %>
-      <% } else { %>
-        <div class="fx-rotulo">Validez</div>
-        <b>15 días</b>
-      <% } %>
+      </div>
+
+      <div class="fx-totales">
+        <span>Subtotal</span><span><%= fmt(doc.subtotal) %></span>
+        <% if (Number(doc.descuento)) { %><span>Descuento</span><span>- <%= fmt(doc.descuento) %></span><% } %>
+        <% if (Number(doc.iva)) { %><span>IVA 19%</span><span><%= fmt(doc.iva) %></span><% } %>
+        <i></i>
+        <span class="fx-total"><%= esFactura ? 'Total a pagar' : 'Total cotizado' %></span>
+        <span class="fx-total"><%= fmt(doc.total) %></span>
+      </div>
     </div>
 
-    <div class="fx-totales">
-      <span>Subtotal</span><span><%= fmt(doc.subtotal) %></span>
-      <% if (Number(doc.descuento)) { %><span>Descuento</span><span>- <%= fmt(doc.descuento) %></span><% } %>
-      <% if (Number(doc.iva)) { %><span>IVA 19%</span><span><%= fmt(doc.iva) %></span><% } %>
-      <i></i>
-      <span class="fx-total"><%= esFactura ? 'Total a pagar' : 'Total cotizado' %></span>
-      <span class="fx-total"><%= fmt(doc.total) %></span>
+    <% if (almacen.nota) { %><div class="fx-nota"><%= almacen.nota %></div><% } %>
+
+    <div class="fx-cierre">
+      <div class="fx-firma"><%= esFactura ? 'Firma y sello' : 'Elaborado por' %></div>
+      <p class="fx-mensaje">
+        <% if (esFactura) { %>
+          ¡Gracias por su compra!<br>
+          Conserve esta factura como comprobante para cualquier cambio o garantía.
+        <% } else { %>
+          Cotización válida por 15 días.<br>
+          Los precios pueden variar según la disponibilidad del material.
+        <% } %>
+      </p>
     </div>
-  </div>
-
-  <% if (almacen.nota) { %>
-    <div class="fx-nota"><%= almacen.nota %></div>
-  <% } %>
-
-  <div class="fx-cierre">
-    <div class="fx-firma"><%= esFactura ? 'Firma y sello' : 'Elaborado por' %></div>
-    <p class="fx-mensaje">
-      <% if (esFactura) { %>
-        ¡Gracias por su compra!<br>
-        Conserve esta factura como comprobante para cualquier cambio o garantía.
-      <% } else { %>
-        Cotización válida por 15 días.<br>
-        Los precios pueden variar según la disponibilidad del material.
-      <% } %>
-    </p>
   </div>
 </div>

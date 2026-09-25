@@ -7,7 +7,7 @@ const { plantillaExcel, inventarioExcel } = require('../lib/importar');
 const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
 const { detectarInvertidos, repararInvertidos, repararCostos } = require('../lib/reparar');
 const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
-const { papelCss, fechaTexto, horaTexto } = require('../lib/impresion');
+const { papelCss, fechaTexto, horaTexto, papelEfectivo } = require('../lib/impresion');
 
 const router = express.Router();
 
@@ -483,7 +483,7 @@ router.get('/traslados/imprimir/:id', async (req, res) => {
     almacen: rows[0],
     traslado: datos.traslado,
     items: datos.items,
-    papelCss: papelCss(rows[0].papel),
+    papelCss: papelCss(papelEfectivo(null, rows[0])),
     hora: horaTexto(datos.traslado.creado_en),
     fechaTexto: fechaTexto(datos.traslado.fecha),
     volver: '/jefa/traslados',
@@ -657,7 +657,7 @@ router.post('/admin/almacenes', soloAdmin, async (req, res) => {
   await pool.query(
     `INSERT INTO almacenes (nombre, region_id, papel, encabezado) VALUES ($1,$2,$3,$1)
      ON CONFLICT (nombre) DO UPDATE SET region_id = EXCLUDED.region_id, papel = EXCLUDED.papel`,
-    [nombre.trim(), region_id || null, papel === '80mm' || papel === '58mm' ? papel : 'carta']
+    [nombre.trim(), region_id || null, papelValido(papel)]
   );
   res.redirect('/jefa/admin?ok=' + encodeURIComponent('Almacén guardado.'));
 });
@@ -666,7 +666,7 @@ router.post('/admin/almacenes/:id/actualizar', soloAdmin, async (req, res) => {
   const { region_id, papel } = req.body;
   await pool.query('UPDATE almacenes SET region_id = $1, papel = $2 WHERE id = $3', [
     region_id || null,
-    papel === '80mm' || papel === '58mm' ? papel : 'carta',
+    papelValido(papel),
     req.params.id,
   ]);
   res.redirect('/jefa/admin?ok=' + encodeURIComponent('Almacén actualizado.'));
@@ -688,6 +688,9 @@ router.post('/admin/almacenes/:id/eliminar', soloAdmin, async (req, res) => {
   await pool.query('DELETE FROM almacenes WHERE id = $1', [req.params.id]);
   res.redirect('/jefa/admin?ok=' + encodeURIComponent(`Almacén «${rows[0].nombre}» eliminado con todos sus datos.`));
 });
+
+const PAPELES_VALIDOS = ['media', 'carta', '80mm', '58mm'];
+const papelValido = (v, porDefecto = 'carta') => (PAPELES_VALIDOS.includes(v) ? v : porDefecto);
 
 const CLAVE_MINIMA = 4;
 
@@ -724,6 +727,8 @@ router.post('/admin/usuarios', soloAdmin, async (req, res) => {
 // Cambiar el usuario de inicio de sesión, el nombre visible y el almacén.
 router.post('/admin/usuarios/:id/editar', soloAdmin, async (req, res) => {
   const { usuario, nombre, almacen_id } = req.body;
+  // Vacío = esta caja imprime con el papel del almacén.
+  const papel = PAPELES_VALIDOS.includes(req.body.papel) ? req.body.papel : null;
   const limpio = (usuario || '').trim().toLowerCase();
 
   if (!limpio || !nombre || !nombre.trim()) {
@@ -743,10 +748,11 @@ router.post('/admin/usuarios/:id/editar', soloAdmin, async (req, res) => {
   const nuevoAlmacen = rows[0].rol === 'almacen' ? almacen_id || rows[0].almacen_id : null;
 
   try {
-    await pool.query('UPDATE usuarios SET usuario = $1, nombre = $2, almacen_id = $3 WHERE id = $4', [
+    await pool.query('UPDATE usuarios SET usuario = $1, nombre = $2, almacen_id = $3, papel = $4 WHERE id = $5', [
       limpio,
       nombre.trim(),
       nuevoAlmacen,
+      rows[0].rol === 'almacen' ? papel : null,
       req.params.id,
     ]);
   } catch (err) {
@@ -757,6 +763,7 @@ router.post('/admin/usuarios/:id/editar', soloAdmin, async (req, res) => {
   if (Number(req.params.id) === req.session.usuario.id) {
     req.session.usuario.usuario = limpio;
     req.session.usuario.nombre = nombre.trim();
+    req.session.usuario.papel = rows[0].rol === 'almacen' ? papel : null;
   }
 
   res.redirect('/jefa/admin?ok=' + encodeURIComponent('Usuario actualizado.'));
@@ -779,6 +786,58 @@ router.post('/admin/usuarios/:id/clave', soloAdmin, async (req, res) => {
   if (rows.length === 0) return res.redirect('/jefa/admin?error=' + encodeURIComponent('Usuario no encontrado.'));
 
   res.redirect('/jefa/admin?ok=' + encodeURIComponent(`Clave de «${rows[0].usuario}» cambiada.`));
+});
+
+// Atajo del mostrador: crear una caja en un almacén. El nombre es el que sale impreso
+// como «Lo atendió», y el usuario de inicio de sesión se arma solo a partir del almacén.
+router.post('/admin/cajas', soloAdmin, async (req, res) => {
+  const { almacen_id, nombre, password } = req.body;
+  const papel = PAPELES_VALIDOS.includes(req.body.papel) ? req.body.papel : null;
+
+  if (!almacen_id || !nombre || !nombre.trim()) {
+    return res.redirect('/jefa/admin?error=' + encodeURIComponent('Elige el almacén y ponle nombre a la caja.'));
+  }
+  if (String(password || '').length < CLAVE_MINIMA) {
+    return res.redirect(
+      '/jefa/admin?error=' + encodeURIComponent(`La clave debe tener al menos ${CLAVE_MINIMA} caracteres.`)
+    );
+  }
+
+  const { rows: alm } = await pool.query('SELECT nombre FROM almacenes WHERE id = $1', [almacen_id]);
+  if (alm.length === 0) return res.redirect('/jefa/admin?error=' + encodeURIComponent('Almacén no encontrado.'));
+
+  const limpiar = (t) =>
+    String(t)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+
+  const base = `${limpiar(alm[0].nombre)}-${limpiar(nombre)}`.slice(0, 40);
+  let login = base;
+  for (let i = 2; i < 30; i++) {
+    const { rows } = await pool.query('SELECT 1 FROM usuarios WHERE usuario = $1', [login]);
+    if (rows.length === 0) break;
+    login = `${base}${i}`;
+  }
+
+  const hash = await bcrypt.hash(String(password), 10);
+  try {
+    await pool.query(
+      `INSERT INTO usuarios (almacen_id, usuario, password_hash, nombre, rol, papel)
+       VALUES ($1,$2,$3,$4,'almacen',$5)`,
+      [almacen_id, login, hash, nombre.trim(), papel]
+    );
+  } catch (err) {
+    return res.redirect('/jefa/admin?error=' + encodeURIComponent('No se pudo crear la caja: ' + err.message));
+  }
+
+  res.redirect(
+    '/jefa/admin?ok=' +
+      encodeURIComponent(
+        `Caja «${nombre.trim()}» creada en ${alm[0].nombre}. Entra con el usuario «${login}» y la clave que escribiste.`
+      )
+  );
 });
 
 router.post('/admin/usuarios/:id/desactivar', soloAdmin, async (req, res) => {

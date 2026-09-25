@@ -48,7 +48,8 @@
                   <% }) %>
                 </select>
                 <select name="papel" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
-                  <option value="carta" <%= a.papel === 'carta' ? 'selected' : '' %>>Hoja carta</option>
+                  <option value="media" <%= a.papel === 'media' ? 'selected' : '' %>>Media carta (22 × 14 cm)</option>
+                  <option value="carta" <%= a.papel === 'carta' ? 'selected' : '' %>>Hoja carta (se corta)</option>
                   <option value="80mm" <%= a.papel === '80mm' ? 'selected' : '' %>>Ticket POS 80mm</option>
                   <option value="58mm" <%= a.papel === '58mm' ? 'selected' : '' %>>Ticket POS 58mm</option>
                 </select>
@@ -81,7 +82,8 @@
         </label>
         <label class="campo">Impresión
           <select name="papel">
-            <option value="carta">Hoja carta</option>
+            <option value="media">Media carta (22 × 14 cm)</option>
+            <option value="carta">Hoja carta (se corta)</option>
             <option value="80mm">Ticket POS 80mm</option>
             <option value="58mm">Ticket POS 58mm</option>
           </select>
@@ -109,6 +111,14 @@
                       <option value="<%= a.id %>" <%= a.id === u.almacen_id ? 'selected' : '' %>><%= a.nombre %></option>
                     <% }) %>
                   </select>
+                  <select name="papel" title="Impresora de esta caja"
+                          style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                    <option value="">Papel del almacén</option>
+                    <option value="media" <%= u.papel === 'media' ? 'selected' : '' %>>Media carta</option>
+                    <option value="carta" <%= u.papel === 'carta' ? 'selected' : '' %>>Hoja carta</option>
+                    <option value="80mm" <%= u.papel === '80mm' ? 'selected' : '' %>>Ticket 80mm</option>
+                    <option value="58mm" <%= u.papel === '58mm' ? 'selected' : '' %>>Ticket 58mm</option>
+                  </select>
                 <% } else { %>
                   <span class="chip almacen"><%= u.rol %></span>
                 <% } %>
@@ -131,6 +141,36 @@
         <% }) %>
       </tbody>
     </table>
+
+    <h3 style="margin-top:24px">Agregar una caja</h3>
+    <p class="ayuda">
+      Atajo para el mostrador: crea un usuario de caja en un almacén. El nombre que pongas aquí es
+      el que sale impreso en la factura como <b>«Lo atendió»</b>, y lo puedes cambiar cuando quieras
+      en la lista de arriba. Si esa caja imprime en otra impresora, elígele su papel.
+    </p>
+    <form method="post" action="/jefa/admin/cajas">
+      <div class="rejilla tres">
+        <label class="campo">Almacén
+          <select name="almacen_id" required>
+            <% almacenes.forEach(a => { %>
+              <option value="<%= a.id %>"><%= a.nombre %><%= a.region_nombre ? ' — ' + a.region_nombre : '' %></option>
+            <% }) %>
+          </select>
+        </label>
+        <label class="campo">Nombre de la caja <input type="text" name="nombre" value="Caja 2" required></label>
+        <label class="campo">Clave <input type="text" name="password" minlength="4" required placeholder="Ej: caja1234"></label>
+        <label class="campo">Impresión de esta caja
+          <select name="papel">
+            <option value="">La del almacén</option>
+            <option value="media">Media carta (22 × 14 cm)</option>
+            <option value="carta">Hoja carta (se corta)</option>
+            <option value="80mm">Ticket POS 80mm</option>
+            <option value="58mm">Ticket POS 58mm</option>
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:14px"><button class="btn prim" type="submit">Crear caja</button></div>
+    </form>
 
     <h3 style="margin-top:24px">Crear usuario</h3>
     <form method="post" action="/jefa/admin/usuarios">

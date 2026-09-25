@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   )
 );
 
+-- Cada caja puede imprimir en un papel distinto al del almacén (por ejemplo, la caja 2
+-- imprime en una Ricoh en media carta). Vacío = usa el papel del almacén.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS papel TEXT;
+
 -- Gastos del almacén (arriendo, nómina, servicios, transporte, etc.)
 -- Se muestran aparte de la ganancia bruta, sin restarse automáticamente.
 CREATE TABLE IF NOT EXISTS gastos (

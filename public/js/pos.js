@@ -173,6 +173,14 @@
       )
       .join('');
 
+    estadoPagos();
+  }
+
+  // Solo el texto de «Falta / Cambio / Pago exacto». Va aparte de pintarPagos porque
+  // redibujar la lista mientras alguien escribe le quita el cursor de la casilla:
+  // por eso el pago mixto obligaba a digitar de a un número.
+  function estadoPagos() {
+    const t = totales().total;
     const pagado = pagos.reduce((a, p) => a + (p.valor === null ? (pagos.length === 1 ? t : 0) : p.valor), 0);
     const estado = $('#pagosEstado');
     const dif = Math.round(pagado - t);
@@ -196,7 +204,9 @@
     if (idx === undefined) return;
     const campo = e.target.dataset.campo;
     pagos[Number(idx)][campo] = campo === 'valor' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value;
-    pintarPagos();
+    // Al escribir un valor NO se redibuja la lista: si no, el cursor se pierde a cada tecla.
+    if (campo === 'valor') estadoPagos();
+    else pintarPagos();
     pintarPreview();
   });
 
@@ -255,8 +265,8 @@
       }
     }
 
-    // En hoja carta la vista previa es la factura normal, no la tirilla.
-    if (a.papel === 'carta') {
+    // En hoja carta / media carta la vista previa es la factura, no la tirilla.
+    if (a.papel === 'carta' || a.papel === 'media') {
       $('#previewFactura').innerHTML = previewCarta(t, a, hora, fecha, cambio);
       return;
     }
@@ -285,7 +295,16 @@
     </div>`;
   }
 
-  // Vista previa de la factura en hoja carta (la misma que sale impresa).
+  // Entre más productos, más apretada la letra: así la factura nunca se sale de la media hoja.
+  function densidad(n) {
+    if (n <= 6) return '';
+    if (n <= 9) return 'd2';
+    if (n <= 13) return 'd3';
+    if (n <= 18) return 'd4';
+    return 'd5';
+  }
+
+  // Vista previa de la factura en media carta (la misma que sale impresa).
   function previewCarta(t, a, hora, fecha, cambio) {
     const esFactura = A.tipo === 'factura';
     const conValor = pagos.map((p) => ({
@@ -311,7 +330,7 @@
            </div>`
         : '';
 
-    return `<div class="fx">
+    return `<div class="fx ${densidad(items.length)}">
       <div class="fx-cab">
         <div class="fx-negocio">
           <strong>${esc(a.encabezado || a.nombre)}</strong>

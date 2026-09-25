@@ -90,35 +90,49 @@ cualquier día). Como la ve el personal, ahí no aparece el costo ni la ganancia
 
 ## Impresión
 
-Cada almacén se configura en hoja carta o en ticket POS térmico (80mm o 58mm) desde
-«Almacenes y usuarios», y cada formato tiene su propio diseño:
+La factura **siempre cabe en 22 × 14 cm** (media hoja carta): 3 cm para los datos del almacén y
+11 cm para los productos, la forma de pago y el total. Si hay muchos productos la letra se aprieta
+sola —de 12 px hasta 7,5 px— para que quepan hasta unas 26 líneas sin recortar nada; si alguna vez
+no cupieran, sigue en otra media hoja antes que cortar un producto.
 
-- **Hoja carta**: una factura normal, pensada para leerse. Arriba el negocio (nombre, dirección,
-  teléfono y NIT) y al frente el tipo de documento, el número, la fecha y la hora; después el
-  cliente y quién atendió; la tabla de productos con cantidad, valor unitario y valor total; los
-  totales a la derecha y la forma de pago a la izquierda; la nota del almacén y, al cerrar, la
-  línea para la firma y el sello del vendedor con un mensaje corto al frente («¡Gracias por su
-  compra! Conserve esta factura como comprobante…»). No lleva firma del cliente.
-  Sin cuadrícula: solo líneas finas que separan los bloques.
-- **Ticket POS (80mm / 58mm)**: el formato de tirilla de siempre, sin cambios.
+Cada almacén (y cada caja) se configura desde «Almacenes y usuarios»:
 
-La **forma de pago** sale sola: si el cliente paga con un solo método dice «Efectivo» o
-«Transferencia»; si paga con dos o más dice **«Mixto»** y debajo el desglose de cuánto fue por cada
-uno (y el cambio, si lo hubo). Los métodos que aparecen en la lista los define cada almacén en
-«Mis datos».
+| Papel | Para qué |
+|---|---|
+| **Media carta (22 × 14 cm)** | La impresora tiene media carta cargada. La hoja es de 22 × 14 cm. |
+| **Hoja carta (se corta)** | Se imprime en carta completa; la factura ocupa la mitad de arriba y hay una línea punteada por dónde cortar. |
+| **Ticket POS 80mm / 58mm** | Impresora térmica de tirilla, con el formato de siempre. |
 
-La vista previa de la pantalla de venta muestra el documento tal como va a salir. La hoja carta se
-ve en grande, a escala de la página real, y la pantalla de venta se ensancha para que quepan las
-dos cosas sin apretar nada.
+La factura lleva arriba el negocio (nombre, dirección, teléfono y NIT) y al frente el tipo de
+documento, el número, la fecha y la hora; después el cliente y **quién lo atendió**; la tabla de
+productos con cantidad, valor unitario y valor total; los totales a la derecha y la forma de pago a
+la izquierda; y al cerrar, la línea de firma y sello con un mensaje corto al frente. Sin cuadrícula.
+
+La **forma de pago** sale sola: con un solo método dice «Efectivo» o «Transferencia»; con dos o más
+dice **«Mixto»** y debajo el desglose de cada uno y el cambio. Los métodos de la lista los define
+cada almacén en «Mis datos».
+
+La vista previa de la pantalla de venta muestra la media hoja tal como va a salir.
 
 Hoy:
 
 | Almacén | Sede | Impresión |
 |---|---|---|
 | PVC La 11 | Valledupar | Ticket POS 80mm |
-| Techos PVC | Valledupar | Hoja carta |
-| Universal Viviana | Valledupar | Hoja carta |
-| PVElectricos | Valledupar | Hoja carta |
+| Techos PVC | Valledupar | Hoja carta / media carta |
+| Universal Viviana | Valledupar | Hoja carta / media carta |
+| PVElectricos | Valledupar | Hoja carta / media carta |
+
+## Cajas (quién atendió)
+
+Un almacén puede tener varias cajas. En «Almacenes y usuarios» → **«Agregar una caja»** se crea en
+un paso: se elige el almacén, se le pone el nombre («Caja 1», «Caja 2», el nombre del vendedor…) y
+una clave; el usuario para entrar se arma solo (por ejemplo `techospvc-caja2`). Ese nombre es el que
+sale impreso como **«Lo atendió»** y se puede cambiar cuando se quiera desde la lista de usuarios.
+
+Cada caja puede imprimir en **su propio papel**, independiente del almacén: por ejemplo la caja 1 en
+hoja carta y la caja 2, que manda a una Ricoh MP C3003 cargada con media carta, en media carta. Si
+se deja en «Papel del almacén», usa el del almacén.
 
 ## Varios usuarios en un mismo almacén
 
@@ -228,7 +242,7 @@ caja de esa noche saldría vacío.
 src/
   server.js                       servidor (Express)
   lib/calculos.js                  totales, IVA y fórmulas de m²
-  lib/impresion.js                 reglas de papel (carta / 80mm / 58mm)
+  lib/impresion.js                 reglas de papel (media carta / carta / 80mm / 58mm)
   lib/inventario.js                cargar inventario desde Excel (con o sin costos)
   lib/reparar.js                   arreglo de precios invertidos y recálculo de facturas
   lib/traslados.js                 mercancía que pasa de un almacén a otro

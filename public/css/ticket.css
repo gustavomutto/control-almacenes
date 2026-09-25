@@ -49,45 +49,66 @@
   #print-area{margin:0;padding:0;box-shadow:none;max-width:none}
 }
 
-/* ---- Factura en hoja carta ----
-   Pensada para leerse como un documento, no como una cuadrícula: sin bordes en cada celda,
-   solo líneas finas que separan bloques. */
-.fx{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.45;width:100%}
-.fx-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;
-  border-bottom:2px solid #111;padding-bottom:10px}
-.fx-negocio strong{display:block;font-size:19px;letter-spacing:.01em;text-transform:uppercase}
-.fx-negocio div{font-size:12.5px}
+/* ---- Factura de media carta (22 x 14 cm) ----
+   Toda la información en media hoja: 3 cm de encabezado y 11 cm para productos,
+   forma de pago y total. Sin cuadrícula; solo líneas finas que separan bloques.
+   Los tamaños van en em para que al apretar la letra (d2..d5) se apriete todo junto. */
+.fx{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12px;line-height:1.35;
+  display:flex;flex-direction:column}
+.fx.d2{font-size:11px}
+.fx.d3{font-size:10px;line-height:1.3}
+.fx.d4{font-size:8.5px;line-height:1.28}
+.fx.d5{font-size:7.5px;line-height:1.25}
+/* Al apretar, las filas pierden aire y se recorta lo prescindible, nunca un producto. */
+.fx.d3 tbody td{padding:.18em .45em}
+.fx.d4 tbody td{padding:.1em .4em}
+.fx.d5 tbody td{padding:.02em .35em}
+.fx.d4 .fx-resumen,.fx.d5 .fx-resumen{margin-top:.4em}
+.fx.d4 .fx-cierre,.fx.d5 .fx-cierre{padding-top:.4em}
+.fx.d4 .fx-nota,.fx.d5 .fx-nota{display:none}
+.fx.d5 .fx-firma{min-width:12em}
+
+/* Encabezado: máximo 3 cm */
+.fx-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5em;
+  max-height:30mm;border-bottom:2px solid #111;padding-bottom:.4em}
+.fx-negocio strong{display:block;font-size:1.5em;line-height:1.15;text-transform:uppercase}
+.fx-negocio div{font-size:.92em}
 .fx-doc{text-align:right;white-space:nowrap}
-.fx-doc .fx-tipo{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.fx-doc .fx-num{font-size:22px;font-weight:700;line-height:1.1}
-.fx-doc div{font-size:12.5px}
-.fx-cliente{display:flex;gap:32px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid #C9CFD6}
-.fx-cliente b{font-weight:700}
-.fx-cliente span{color:#555;margin-right:4px}
-.fx table{width:100%;border-collapse:collapse;margin-top:14px}
-.fx thead th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555;
-  text-align:right;padding:0 6px 6px;border-bottom:1.5px solid #111}
+.fx-doc .fx-tipo{font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.fx-doc .fx-num{font-size:1.5em;font-weight:700;line-height:1.15}
+.fx-doc div{font-size:.92em}
+
+.fx-cliente{display:flex;gap:2em;flex-wrap:wrap;padding:.35em 0;border-bottom:1px solid #C9CFD6}
+.fx-cliente span{color:#555;margin-right:.3em}
+
+/* Cuerpo: productos + pago + total, 11 cm */
+.fx-cuerpo{flex:1;display:flex;flex-direction:column;min-height:0}
+.fx table{width:100%;border-collapse:collapse;margin-top:.5em}
+.fx thead th{font-size:.82em;text-transform:uppercase;letter-spacing:.03em;color:#555;
+  text-align:right;padding:0 .5em .3em;border-bottom:1.5px solid #111}
 .fx thead th:first-child{text-align:left;padding-left:0}
-.fx tbody td{padding:6px;border-bottom:1px solid #E4E8EC;text-align:right;vertical-align:top}
+.fx tbody td{padding:.28em .5em;border-bottom:1px solid #E4E8EC;text-align:right;vertical-align:top}
 .fx tbody td:first-child{text-align:left;padding-left:0}
 .fx tbody td small{display:block;color:#555;font-weight:400}
-.fx-resumen{display:flex;justify-content:space-between;gap:36px;margin-top:16px;flex-wrap:wrap}
-.fx-pago{min-width:220px}
-.fx-pago .fx-rotulo{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#555}
-.fx-pago b{font-size:14px}
-.fx-pago .fx-detalle{display:grid;grid-template-columns:1fr auto;column-gap:18px;margin-top:4px}
-.fx-totales{min-width:250px;margin-left:auto;display:grid;grid-template-columns:1fr auto;
-  column-gap:22px;row-gap:3px;text-align:right}
-.fx-totales i{grid-column:1/-1;border-top:1.5px solid #111;margin-top:5px}
-.fx-totales .fx-total{font-size:17px;font-weight:700;padding-top:4px}
-.fx-nota{margin-top:18px;padding-top:10px;border-top:1px solid #C9CFD6;color:#333}
-.fx-cierre{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:end;margin-top:44px}
-.fx-firma{border-top:1px solid #111;text-align:center;padding-top:4px;font-size:11.5px;color:#555}
-.fx-mensaje{margin:0;font-size:12px;color:#333;text-align:right;line-height:1.5}
+
+.fx-resumen{display:flex;justify-content:space-between;gap:2em;margin-top:.7em;flex-wrap:wrap}
+.fx-pago{min-width:14em}
+.fx-pago .fx-rotulo{font-size:.82em;text-transform:uppercase;letter-spacing:.03em;color:#555}
+.fx-pago b{font-size:1.1em}
+.fx-pago .fx-detalle{display:grid;grid-template-columns:1fr auto;column-gap:1.2em}
+.fx-totales{min-width:16em;margin-left:auto;display:grid;grid-template-columns:1fr auto;
+  column-gap:1.4em;row-gap:.1em;text-align:right}
+.fx-totales i{grid-column:1/-1;border-top:1.5px solid #111;margin-top:.3em}
+.fx-totales .fx-total{font-size:1.3em;font-weight:700;padding-top:.2em}
+
+.fx-cierre{display:flex;justify-content:space-between;align-items:flex-end;gap:2em;margin-top:auto;padding-top:.8em}
+.fx-firma{border-top:1px solid #111;text-align:center;padding-top:.2em;font-size:.85em;color:#555;min-width:16em}
+.fx-mensaje{margin:0;font-size:.88em;color:#333;text-align:right;line-height:1.4}
+.fx-nota{font-size:.88em;color:#333;padding-top:.5em}
 
 /* La vista previa de la hoja carta se muestra encogida, para que quepa al lado de la venta. */
 .papel-carta{--esc:.62;padding:0;position:relative;overflow:hidden;max-width:100%;
-  width:calc(216mm * var(--esc));height:calc(279mm * var(--esc))}
-.papel-carta .fx{position:absolute;top:0;left:0;width:216mm;height:279mm;padding:16mm;background:#fff;
+  width:calc(216mm * var(--esc));height:calc(140mm * var(--esc))}
+.papel-carta .fx{position:absolute;top:0;left:0;width:204mm;height:130mm;padding:5mm 6mm;background:#fff;
   transform:scale(var(--esc));transform-origin:top left}
 @media (max-width:620px){.papel-carta{--esc:.42}}

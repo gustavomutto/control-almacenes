@@ -16,14 +16,14 @@
     <a class="btn linea" href="<%= volver %>">← Volver</a>
     <span>
       <%= doc.tipo === 'factura' ? 'Factura' : 'Cotización' %> N° <%= doc.numero %> ·
-      <%= almacen.papel === 'carta' ? 'hoja carta' : 'ticket ' + almacen.papel %>
+      <%= papelNombre %>
     </span>
     <button class="btn prim" onclick="window.print()">Imprimir</button>
   </div>
 
   <div id="print-area">
-    <% if (almacen.papel === 'carta') { %>
-      <%- include('partials/factura', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
+    <% if (papel === 'carta' || papel === 'media') { %>
+      <%- include('partials/factura', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant, densidad }) %>
     <% } else { %>
       <%- include('partials/ticket', { almacen, doc, items, pagos, hora, fechaTexto, fmt, fmtCant }) %>
     <% } %>

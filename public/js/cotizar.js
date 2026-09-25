@@ -180,8 +180,8 @@
         )
         .join('') || '<tr><td colspan="4">&nbsp;</td></tr>';
 
-    // En hoja carta la cotización se ve como documento, no como tirilla.
-    if (a.papel === 'carta') {
+    // En hoja carta / media carta la cotización se ve como documento, no como tirilla.
+    if (a.papel === 'carta' || a.papel === 'media') {
       const filasCarta =
         items
           .map(
@@ -190,7 +190,9 @@
           )
           .join('') || '<tr><td colspan="4">&nbsp;</td></tr>';
 
-      $('#previewFactura').innerHTML = `<div class="fx">
+      const n = items.length;
+      const dens = n <= 6 ? '' : n <= 9 ? 'd2' : n <= 13 ? 'd3' : n <= 18 ? 'd4' : 'd5';
+      $('#previewFactura').innerHTML = `<div class="fx ${dens}">
         <div class="fx-cab">
           <div class="fx-negocio">
             <strong>${esc(a.encabezado || a.nombre)}</strong>

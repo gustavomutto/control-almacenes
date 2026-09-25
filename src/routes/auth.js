@@ -13,7 +13,8 @@ router.post('/login', async (req, res) => {
   const { usuario, password } = req.body;
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.usuario, u.password_hash, u.nombre, u.rol, u.almacen_id, a.nombre AS almacen_nombre
+      `SELECT u.id, u.usuario, u.password_hash, u.nombre, u.rol, u.almacen_id, u.papel,
+              a.nombre AS almacen_nombre
        FROM usuarios u
        LEFT JOIN almacenes a ON a.id = u.almacen_id
        WHERE u.usuario = $1 AND u.activo = true`,
@@ -33,6 +34,7 @@ router.post('/login', async (req, res) => {
       rol: fila.rol,
       almacenId: fila.almacen_id,
       almacenNombre: fila.almacen_nombre,
+      papel: fila.papel || null, // papel propio de esta caja; si está vacío, el del almacén
     };
     res.redirect('/');
   } catch (err) {
