@@ -137,6 +137,23 @@ CREATE TABLE IF NOT EXISTS movimientos_inventario (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ventas y cotizaciones a medio hacer («en espera»). El cliente que no se decide no
+-- bloquea la caja: se guarda lo que va y se atiende al siguiente. No es un documento:
+-- no tiene número, no mueve inventario y no aparece en ningún reporte.
+CREATE TABLE IF NOT EXISTS borradores (
+  id SERIAL PRIMARY KEY,
+  almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('factura','cotizacion')),
+  nombre TEXT NOT NULL DEFAULT '',
+  datos JSONB NOT NULL,
+  total NUMERIC(14,2) NOT NULL DEFAULT 0,
+  lineas INTEGER NOT NULL DEFAULT 0,
+  registrado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_borradores_almacen ON borradores (almacen_id, tipo, actualizado_en DESC);
+
 -- ============================================================
 -- Traslados de mercancía entre almacenes
 -- ============================================================

@@ -6,6 +6,7 @@
 
   <div class="vista-pos">
     <div class="trabajo">
+      <div id="espera" class="espera"></div>
       <div class="buscador">
         <input id="buscar" type="text" autocomplete="off" spellcheck="false"
                placeholder="Buscar producto y presionar Enter" aria-label="Buscar producto">
@@ -58,6 +59,7 @@
 window.APP = {
   productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, precio: Number(p.precio_venta), existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
   metodos: <%- JSON.stringify((almacen.metodos_pago || 'Efectivo,Transferencia').split(',').map(s => s.trim()).filter(Boolean)) %>,
+  almacenId: <%= almacen.id %>,
   almacen: <%- JSON.stringify({ nombre: almacen.nombre, encabezado: almacen.encabezado, direccion: almacen.direccion, nit: almacen.nit, telefono: almacen.telefono, nota: almacen.nota, papel: almacen.papel }) %>,
   numero: <%= proximoNumero %>,
   vendedor: <%- JSON.stringify(usuario.nombre) %>,
@@ -65,6 +67,7 @@ window.APP = {
   endpoint: '/almacen/facturar'
 };
 </script>
+<script src="/js/espera.js?v=<%= v %>"></script>
 <script src="/js/pos.js?v=<%= v %>"></script>
 </body>
 </html>

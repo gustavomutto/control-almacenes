@@ -11,6 +11,9 @@
   let items = [];
   let enviando = false;
 
+  // Cotizaciones en espera (se conecta al final; así `pintar()` ya puede llamarlo).
+  let espera = { autoguardar() {}, alCobrar() {} };
+
   // Mismas fórmulas del programa original; la cantidad se redondea hacia arriba.
   const FORMULAS = {
     lamina: (m) => m / 1.79,
@@ -258,6 +261,41 @@
     pintarItems();
     pintarTotales();
     pintarPreview();
+    espera.autoguardar();
+  }
+
+  // ---------- Lo que se guarda y se retoma ----------
+  function estadoActual() {
+    return {
+      lineas: items.length,
+      total: totales().total,
+      nombre: $('#fCliente').value.trim(),
+      datos: {
+        items,
+        cliente: $('#fCliente').value,
+        descuento: $('#fDescuento').value,
+        iva: $('#fIva').checked,
+        m2: $('#cM2').value,
+      },
+    };
+  }
+
+  function cargarEstado(d) {
+    if (!d) return;
+    items = Array.isArray(d.items) ? d.items : [];
+    $('#fCliente').value = d.cliente || '';
+    $('#fDescuento').value = d.descuento || '';
+    $('#cM2').value = d.m2 || '';
+    $('#fIva').checked = Boolean(d.iva);
+    pintar();
+  }
+
+  function limpiarCotizacion() {
+    items = [];
+    $('#cM2').value = '';
+    $('#fCliente').value = '';
+    $('#fDescuento').value = '';
+    pintar();
   }
 
   $('#btnCobrar').addEventListener('click', async () => {
@@ -288,6 +326,7 @@
       });
       const data = await r.json();
       if (!data.ok) throw new Error(data.error || 'No se pudo guardar');
+      espera.alCobrar(); // ya quedó guardada como cotización
       window.location.href = data.imprimir;
     } catch (err) {
       alert('No se pudo guardar la cotización: ' + err.message);
@@ -297,11 +336,8 @@
   });
 
   $('#btnNueva').addEventListener('click', () => {
-    items = [];
-    $('#cM2').value = '';
-    $('#fCliente').value = '';
-    $('#fDescuento').value = '';
-    pintar();
+    if (items.length > 0 && !confirm('¿Vaciar esta cotización? Si el cliente va a volver, mejor déjala en espera.')) return;
+    limpiarCotizacion();
   });
 
   ['#fDescuento', '#cM2'].forEach((sel) =>
@@ -314,7 +350,21 @@
     pintarTotales();
     pintarPreview();
   });
-  $('#fCliente').addEventListener('input', pintarPreview);
+  $('#fCliente').addEventListener('input', () => {
+    pintarPreview();
+    espera.autoguardar();
+  });
+
+  if (window.Espera) {
+    espera = window.Espera.init({
+      tipo: 'cotizacion',
+      contenedor: '#espera',
+      almacenId: A.almacenId,
+      estado: estadoActual,
+      cargar: cargarEstado,
+      limpiar: limpiarCotizacion,
+    });
+  }
 
   pintar();
 })();

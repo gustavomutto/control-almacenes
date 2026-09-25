@@ -12,6 +12,10 @@
   let pagos = [{ metodo: A.metodos[0] || 'Efectivo', valor: null }];
   let enviando = false;
 
+  // Ventas en espera (se conecta más abajo; así `pintar()` ya puede llamarlo sin romperse).
+  let espera = { autoguardar() {}, alCobrar() {} };
+  const IVA_DEFECTO = document.querySelector('#fIva').checked;
+
   // ---------- Totales ----------
   function totales() {
     const subtotal = items.reduce((a, i) => a + i.cantidad * i.precio, 0);
@@ -364,6 +368,43 @@
     pintarItems();
     pintarTotales();
     pintarPreview();
+    espera.autoguardar();
+  }
+
+  // ---------- Lo que se guarda y se retoma ----------
+  function estadoActual() {
+    const t = totales();
+    return {
+      lineas: items.length,
+      total: t.total,
+      nombre: $('#fCliente').value.trim(),
+      datos: {
+        items,
+        pagos,
+        cliente: $('#fCliente').value,
+        descuento: $('#fDescuento').value,
+        iva: $('#fIva').checked,
+      },
+    };
+  }
+
+  function cargarEstado(d) {
+    if (!d) return;
+    items = Array.isArray(d.items) ? d.items : [];
+    pagos = Array.isArray(d.pagos) && d.pagos.length ? d.pagos : [{ metodo: A.metodos[0] || 'Efectivo', valor: null }];
+    $('#fCliente').value = d.cliente || '';
+    $('#fDescuento').value = d.descuento || '';
+    $('#fIva').checked = Boolean(d.iva);
+    pintar();
+  }
+
+  function limpiarVenta() {
+    items = [];
+    pagos = [{ metodo: A.metodos[0] || 'Efectivo', valor: null }];
+    $('#fCliente').value = '';
+    $('#fDescuento').value = '';
+    $('#fIva').checked = IVA_DEFECTO;
+    pintar();
   }
 
   // ---------- Guardar ----------
@@ -410,6 +451,7 @@
       });
       const data = await r.json();
       if (!data.ok) throw new Error(data.error || 'No se pudo guardar');
+      espera.alCobrar(); // ya es una factura: el borrador local se descarta
       window.location.href = data.imprimir;
     } catch (err) {
       alert('No se pudo guardar la venta: ' + err.message);
@@ -419,11 +461,8 @@
   });
 
   $('#btnNueva').addEventListener('click', () => {
-    items = [];
-    pagos = [{ metodo: A.metodos[0] || 'Efectivo', valor: null }];
-    $('#fCliente').value = '';
-    $('#fDescuento').value = '';
-    pintar();
+    if (items.length > 0 && !confirm('¿Vaciar esta venta? Si el cliente va a volver, mejor déjala en espera.')) return;
+    limpiarVenta();
     buscar.focus();
   });
 
@@ -454,6 +493,19 @@
       $('#btnNueva').click();
     }
   });
+
+  $('#fCliente').addEventListener('input', () => espera.autoguardar());
+
+  if (window.Espera) {
+    espera = window.Espera.init({
+      tipo: 'factura',
+      contenedor: '#espera',
+      almacenId: A.almacenId,
+      estado: estadoActual,
+      cargar: cargarEstado,
+      limpiar: limpiarVenta,
+    });
+  }
 
   pintar();
   buscar.focus();

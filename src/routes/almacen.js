@@ -446,6 +446,86 @@ router.post('/gastos/:id/eliminar', async (req, res) => {
   res.redirect(`/almacen/caja?fecha=${fecha}&ok=` + encodeURIComponent('Gasto eliminado.'));
 });
 
+// ============================ VENTAS EN ESPERA ============================
+// Un cliente que no se decide no puede bloquear la caja. La venta a medio hacer se guarda
+// «en espera» y el vendedor atiende al siguiente; después la retoma donde iba.
+// Ojo: NO es una factura. No tiene número, no descuenta inventario y no aparece en reportes;
+// la mercancía sigue disponible para quien la compre primero.
+
+const MAX_ESPERA = 30;
+
+function tipoBorrador(valor) {
+  return valor === 'cotizacion' ? 'cotizacion' : 'factura';
+}
+
+router.get('/borradores', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT b.id, b.nombre, b.total, b.lineas, b.actualizado_en, u.nombre AS vendedor
+     FROM borradores b LEFT JOIN usuarios u ON u.id = b.registrado_por
+     WHERE b.almacen_id = $1 AND b.tipo = $2
+     ORDER BY b.actualizado_en DESC LIMIT $3`,
+    [req.session.usuario.almacenId, tipoBorrador(req.query.tipo), MAX_ESPERA]
+  );
+  res.json({ ok: true, borradores: rows });
+});
+
+router.post('/borradores', express.json({ limit: '256kb' }), async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const tipo = tipoBorrador(req.body.tipo);
+
+  try {
+    // Una venta en espera de hace un mes ya no la reclama nadie: se limpia sola.
+    await pool.query(
+      "DELETE FROM borradores WHERE almacen_id = $1 AND actualizado_en < now() - INTERVAL '30 days'",
+      [almacenId]
+    );
+
+    const { rows: cuenta } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM borradores WHERE almacen_id = $1 AND tipo = $2',
+      [almacenId, tipo]
+    );
+    if (cuenta[0].n >= MAX_ESPERA) {
+      throw new Error(`Ya hay ${MAX_ESPERA} en espera. Cierra o borra alguna antes de guardar otra.`);
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO borradores (almacen_id, tipo, nombre, datos, total, lineas, registrado_por)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [
+        almacenId,
+        tipo,
+        String(req.body.nombre || '').slice(0, 120) || 'Sin nombre',
+        req.body.datos || {},
+        Number(req.body.total) || 0,
+        Number(req.body.lineas) || 0,
+        req.session.usuario.id,
+      ]
+    );
+    res.json({ ok: true, id: rows[0].id });
+  } catch (err) {
+    console.error('Error guardando en espera:', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// Retomar: devuelve el contenido y lo saca de la lista (pasa a ser la venta abierta).
+router.post('/borradores/:id/abrir', async (req, res) => {
+  const { rows } = await pool.query('DELETE FROM borradores WHERE id = $1 AND almacen_id = $2 RETURNING *', [
+    req.params.id,
+    req.session.usuario.almacenId,
+  ]);
+  if (rows.length === 0) return res.status(404).json({ ok: false, error: 'Esa venta en espera ya no está.' });
+  res.json({ ok: true, borrador: rows[0] });
+});
+
+router.post('/borradores/:id/eliminar', async (req, res) => {
+  await pool.query('DELETE FROM borradores WHERE id = $1 AND almacen_id = $2', [
+    req.params.id,
+    req.session.usuario.almacenId,
+  ]);
+  res.json({ ok: true });
+});
+
 // ============ INVENTARIO POR EXCEL (descargar, llenar y volver a subir) ============
 // El personal del almacén nunca ve ni cambia el precio de costo: ni baja en el archivo
 // ni se toca al subirlo, aunque alguien le agregue esa columna a mano.

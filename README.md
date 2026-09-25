@@ -36,6 +36,26 @@ administración y la ganancia se calcula solo para ellos.
 - **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
   impresos.
 
+## Ventas en espera
+
+Un cliente que no se decide no puede bloquear la caja. Con **«Dejar esta venta en espera»** lo que
+va en pantalla se guarda a nombre del cliente y la caja queda libre para atender al siguiente; la
+venta guardada aparece como una etiqueta arriba y se retoma con un clic, exactamente donde iba.
+Funciona igual en «Cotizar», con su propia lista.
+
+Tres detalles que importan en el mostrador:
+
+- Si hay una venta abierta y se retoma otra, la abierta se guarda sola: nunca se pierde nada.
+- Si se recarga la página, se cierra el navegador sin querer o se va la luz, al volver a entrar la
+  venta que estaba en pantalla se recupera sola (se va guardando en el mismo equipo). Las que están
+  «en espera» viven en el servidor, así que también se pueden retomar desde otra caja del mismo
+  almacén o desde otro dispositivo.
+- Una venta en espera **no es una factura**: no tiene número, no descuenta inventario y no aparece
+  en caja ni en los reportes. La mercancía sigue disponible para quien la compre primero; el
+  inventario solo se mueve al cobrar.
+
+Cada almacén puede tener hasta 30 en espera de cada tipo, y las que pasan de un mes se borran solas.
+
 ## Traslados entre almacenes
 
 Mandar mercancía a otro almacén **no es una venta**: no lleva precio, no entra a la caja y no
@@ -222,6 +242,7 @@ public/css/estilo.css               estilos
 public/css/ticket.css               formato del ticket/factura impresa
 public/js/pos.js                    pantalla de venta
 public/js/cotizar.js                pantalla de cotización
+public/js/espera.js                 ventas y cotizaciones a medio hacer
 ```
 
 ## Desplegar en Railway
