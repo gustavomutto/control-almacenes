@@ -1,8 +1,9 @@
 // Reglas de papel para imprimir: media carta, hoja carta o ticket térmico POS (58/80mm).
 //
 // MEDIA CARTA es el papel que de verdad está cargado en la Ricoh: 8,5 × 6,5 pulgadas
-// (21,6 × 16,5 cm). Se le pide a Chrome exactamente en pulgadas, con el mismo número que
-// tiene el formulario del driver, para que lo reconozca y no intente reescalar.
+// (21,6 × 16,5 cm). El sistema NO le impone el tamaño a la impresora: usa el que tenga
+// configurado el driver y arma la factura dentro de él. Así no hay discusión de formatos
+// con equipos que validan el tamaño del trabajo contra el de la bandeja.
 //
 // El contenido de la factura sigue armado para 22 × 14 cm (3 cm de encabezado y 11 cm de
 // productos, pago y total): entra en la hoja con 2,5 cm de sobra abajo, que es justo el
@@ -29,13 +30,17 @@ const UNA_SOLA_HOJA =
 const PAPELES = {
   '58mm': '@page{margin:0} #print-area .tk{width:54mm;padding:2mm;font-size:9px}',
   '80mm': '@page{margin:0} #print-area .tk{width:74mm;padding:3mm;font-size:11px}',
-  // Media carta: la hoja mide 8,5 x 6,5 pulgadas.
+  // IMPORTANTE: ni «media» ni «carta» le dicen a la impresora de qué tamaño es la hoja.
+  // El tamaño lo manda el driver (lo que esté configurado en la impresora), y la factura
+  // simplemente se arma dentro de ese papel. Cuando la página imponía el tamaño con
+  // @page size, la Ricoh comparaba ese tamaño con el de la bandeja y rechazaba el trabajo;
+  // los equipos de oficina son estrictos con eso, a diferencia de una impresora sencilla.
   media:
-    `@page{size:8.5in 6.5in;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
+    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:11px}',
-  // Hoja carta completa: la factura ocupa la parte de arriba y se corta por la línea punteada.
+  // Igual, pero el bloque mide 13 cm y lleva la línea de corte para la hoja carta completa.
   carta:
-    `@page{size:letter;margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
+    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
     'border-bottom:1px dashed #999}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
@@ -83,7 +88,7 @@ function papelEfectivo(usuario, almacen) {
 }
 
 const NOMBRES_PAPEL = {
-  media: 'media carta (8,5 × 6,5 pulgadas)',
+  media: 'media carta (el tamaño lo pone la impresora)',
   carta: 'hoja carta (se corta a la mitad)',
   '80mm': 'ticket 80mm',
   '58mm': 'ticket 58mm',

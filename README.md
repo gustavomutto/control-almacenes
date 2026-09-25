@@ -94,10 +94,14 @@ La factura se arma **siempre dentro de 22 × 14 cm**: 3 cm para los datos del al
 los productos, la forma de pago y el total. Si hay muchos productos la letra se aprieta sola —de
 12 px hasta 7,5 px— para que quepan hasta unas 26 líneas sin recortar nada.
 
-La hoja de **media carta** se le pide a la impresora en pulgadas exactas, **8,5 × 6,5 pulgadas**
-(21,6 × 16,5 cm), que es la medida del formulario del driver de la Ricoh. Eso importa: si el tamaño
-que pide el sistema no existe igualito en el driver, Chrome usa otro y lo reescala, y la impresora
-reclama el formato. El contenido de 14 cm entra en esa hoja con 2,5 cm de sobra abajo.
+**El sistema no le impone el tamaño de hoja a la impresora.** La página no declara ningún tamaño:
+usa el que tenga configurado el driver —en la Ricoh, media carta de 8,5 × 6,5 pulgadas— y arma la
+factura dentro de él. Esto es a propósito: las multifuncionales de oficina comparan el tamaño que
+pide el trabajo contra el que tiene declarado la bandeja, y si no coinciden al milímetro rechazan
+el trabajo o lo reportan como atasco. Dejando que mande el driver, no hay discusión posible.
+
+Como el bloque de la factura mide 15 cm de alto, entra igual en media carta (16,5 cm) que en una
+hoja carta, donde sale en la parte de arriba.
 
 Cada almacén (y cada caja) se configura desde «Almacenes y usuarios»:
 
@@ -123,9 +127,10 @@ La factura se imprime **siempre en una sola hoja**: el bloque tiene un alto fijo
 saltar a otra hoja. Antes, un milímetro de sobra empujaba una segunda hoja casi en blanco y la
 impresora la reportaba como atasco. Probado de 1 a 40 productos: una hoja, sin cortar nada.
 
-En el PC de la caja: el formulario de papel del driver debe medir 8,5 × 6,5 pulgadas y, después de
-crearlo, hay que **cerrar y volver a abrir Chrome** (lee los tamaños de la impresora una sola vez y
-los deja en caché). En la ventana de impresión: escala 100 % —nunca «ajustar al área de impresión»—
+En el PC de la caja: el tamaño de papel se configura **en la impresora** (el tamaño de la bandeja,
+desde el panel del equipo) y **en el driver** (preferencias de impresión), no en el sistema. Después
+de cambiar algo ahí hay que **cerrar y volver a abrir Chrome**, que lee los datos de la impresora
+una sola vez y los deja en caché. En la ventana de impresión: escala 100 % —nunca «ajustar al área de impresión»—
 y encabezados y pies de página apagados. Para imprimir sin ninguna ventana, un acceso directo a
 Chrome con `--kiosk-printing` manda el trabajo derecho a la impresora predeterminada.
 
