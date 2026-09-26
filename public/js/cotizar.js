@@ -313,6 +313,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          documento_id: A.editando ? A.editando.id : undefined,
           cliente: $('#fCliente').value,
           descuento: Number($('#fDescuento').value) || 0,
           iva: $('#fIva').checked,
@@ -357,7 +358,17 @@
     espera.autoguardar();
   });
 
-  if (window.Espera) {
+  if (A.editando) {
+    cargarEstado({
+      items: A.editando.items,
+      cliente: A.editando.cliente,
+      descuento: A.editando.descuento || '',
+      iva: A.editando.iva,
+      m2: A.editando.m2 || '',
+    });
+    $('#btnCobrar').textContent = 'Guardar cambios e imprimir';
+    $('#btnNueva').style.display = 'none';
+  } else if (window.Espera) {
     espera = window.Espera.init({
       tipo: 'cotizacion',
       contenedor: '#espera',

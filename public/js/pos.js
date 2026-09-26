@@ -339,7 +339,7 @@
         </div>
         <div class="fx-doc">
           <div class="fx-tipo">${esFactura ? 'Factura de venta' : 'Cotización'}</div>
-          <div class="fx-num">N° ${A.numero}</div>
+          <div class="fx-num">N° ${A.editando ? A.editando.numero : A.numero}</div>
           <div>${fecha}</div>
           <div>${hora}</div>
         </div>
@@ -445,6 +445,7 @@
 
     const t = totales();
     const cuerpo = {
+      documento_id: A.editando ? A.editando.id : undefined,
       cliente: $('#fCliente').value,
       descuento: Number($('#fDescuento').value) || 0,
       iva: $('#fIva').checked,
@@ -520,7 +521,21 @@
 
   $('#fCliente').addEventListener('input', () => espera.autoguardar());
 
-  if (window.Espera) {
+  // Editando una factura ya hecha: se carga tal como quedó y no hay ventas «en espera»
+  // de por medio, para no mezclar una corrección con una venta nueva.
+  if (A.editando) {
+    cargarEstado({
+      items: A.editando.items,
+      pagos: A.editando.pagos.length ? A.editando.pagos : [{ metodo: A.metodos[0] || 'Efectivo', valor: null }],
+      cliente: A.editando.cliente,
+      descuento: A.editando.descuento || '',
+      iva: A.editando.iva,
+    });
+    $('#btnCobrar').textContent = 'Guardar cambios e imprimir';
+    $('#btnNueva').style.display = 'none';
+    const re = $('#btnReimprimir');
+    if (re) re.style.display = 'none';
+  } else if (window.Espera) {
     espera = window.Espera.init({
       tipo: 'factura',
       contenedor: '#espera',

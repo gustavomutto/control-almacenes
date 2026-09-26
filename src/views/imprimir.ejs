@@ -30,14 +30,15 @@
   </div>
 
 <script>
-// Red de seguridad: si por alguna razón el contenido no cupiera en la hoja, se encoge la
-// letra hasta que quepa. Antes el sobrante empujaba una segunda hoja casi en blanco y la
-// impresora la reportaba como atasco.
+// Red de seguridad: la factura no puede pasar del alto que de verdad imprime la máquina.
+// Si se pasa, se encoge la letra hasta que quepa. Sin esto, el sobrante se iba a una
+// segunda hoja —productos en una y firma en otra— y la impresora la reportaba como atasco.
 (function ajustarAlaHoja() {
   var fx = document.querySelector('#print-area .fx');
   if (!fx) return;
+  var tope = <%= altoMaximo %> * 96 / 25.4; // milímetros a pixeles
   var tam = parseFloat(getComputedStyle(fx).fontSize);
-  for (var i = 0; i < 40 && fx.scrollHeight > fx.clientHeight + 1 && tam > 5; i++) {
+  for (var i = 0; i < 60 && fx.getBoundingClientRect().height > tope + 1 && tam > 5; i++) {
     tam -= 0.25;
     fx.style.fontSize = tam + 'px';
   }

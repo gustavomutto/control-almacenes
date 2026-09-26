@@ -25,7 +25,8 @@ administración y la ganancia se calcula solo para ellos.
 - **Cotizar**: calculadora de metros cuadrados para techos PVC (lámina, cornisa, omega,
   vigueta, ángulo y tornillos, con las mismas fórmulas del programa original) más productos
   sueltos. Las cotizaciones no mueven inventario.
-- **Facturas**: historial por día, reimprimir y anular (al anular, el inventario se devuelve).
+- **Facturas**: historial por día, reimprimir, **editar**, cambiar la forma de pago y anular
+  (al anular, el inventario se devuelve).
 - **Productos**: catálogo con precio de venta, unidad y existencias; registrar entradas de
   mercancía, y cargar el inventario desde Excel (se descarga como está hoy, se llena y se sube).
 - **Traslados**: hoja para mandar mercancía a otro almacén, sin precios. Sale del inventario de
@@ -60,6 +61,27 @@ Tres detalles que importan en el mostrador:
   el inventario solo se mueve al cobrar.
 
 Cada almacén puede tener hasta 30 en espera de cada tipo, y las que pasan de un mes se borran solas.
+
+## Corregir una factura o una cotización
+
+Una venta mal hecha se corrige en vez de anularla y volverla a hacer. En «Facturas», el botón
+**Editar** la abre en la pantalla de venta tal como quedó —productos, cliente, descuento, IVA y
+pagos— y al guardar **conserva su número y su fecha**. Igual con las cotizaciones.
+
+Por dentro es como deshacerla y rehacerla, todo en una sola transacción: se devuelve al inventario
+lo que la factura había descontado, se descuenta lo nuevo y se vuelven a calcular totales, costo y
+ganancia con los precios de costo de hoy. Si una factura de 3 láminas se corrige a 5, el inventario
+queda con 5 descontadas, no con 8.
+
+La **forma de pago** se cambia sin abrir nada: en la misma lista, cada factura del día trae un
+selector y un valor —y un segundo par para los pagos mixtos—. No deja guardar si los pagos suman
+menos que el total.
+
+Quién y hasta cuándo: el personal del almacén corrige **las facturas del día**, que es cuando
+aparecen los errores, y las de días anteriores quedan congeladas para que un reporte ya revisado no
+cambie por detrás. Las cotizaciones se pueden corregir siempre, porque no mueven inventario ni caja.
+Cada corrección queda registrada con el usuario y la hora, y la lista muestra cuántas veces se editó
+cada documento.
 
 ## Traslados entre almacenes
 
@@ -100,8 +122,17 @@ factura dentro de él. Esto es a propósito: las multifuncionales de oficina com
 pide el trabajo contra el que tiene declarado la bandeja, y si no coinciden al milímetro rechazan
 el trabajo o lo reportan como atasco. Dejando que mande el driver, no hay discusión posible.
 
-Como el bloque de la factura mide 15 cm de alto, entra igual en media carta (16,5 cm) que en una
-hoja carta, donde sale en la parte de arriba.
+Lo único que sí declara la página es la **orientación**: media carta va acostada (`size: landscape`,
+el lado largo en horizontal) y la hoja carta parada. Eso no impone medidas —solo dice cuál lado va
+horizontal— así que no hay conflicto con la bandeja, y evita que la impresora escriba a lo largo del
+lado angosto de la hoja.
+
+El bloque de la factura **no tiene alto fijo**: mide lo que mide su contenido, con un tope de
+12,5 cm. Ese tope no es el alto de la hoja, es hasta dónde la dejamos crecer para que quepa con
+holgura en el área que de verdad imprime la máquina (toda impresora tiene un borde que no puede
+marcar). Cuando el bloque tenía alto fijo y el área imprimible resultaba más corta, no cabía y se
+partía en dos hojas —los productos en una, empujados hacia abajo, y la firma en otra—. Si el
+contenido pasa del tope, la letra se encoge hasta que quepa.
 
 Cada almacén (y cada caja) se configura desde «Almacenes y usuarios»:
 

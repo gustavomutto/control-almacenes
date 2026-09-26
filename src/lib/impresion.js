@@ -12,14 +12,11 @@
 // Va fijo a propósito: con min-height, un milímetro de más empujaba una segunda hoja en
 // blanco y la impresora la reportaba como atasco. Si el contenido no cupiera, un script
 // en la página de impresión encoge la letra hasta que quepa, en vez de saltar de hoja.
-const ALTO_IMPRESION = { media: '150mm', carta: '130mm' };
-
-function cajaImpresion(papel) {
-  return (
-    `width:100%;height:${ALTO_IMPRESION[papel]};overflow:hidden;` +
-    'break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid'
-  );
-}
+// Tope de alto del contenido, en milímetros. No es el alto de la hoja: es hasta dónde
+// dejamos crecer la factura para que quepa con holgura en el área que de verdad imprime
+// la máquina (toda impresora tiene un borde que no puede marcar, y en media carta ese
+// borde se come varios milímetros). Si el contenido pasa de aquí, la letra se encoge.
+const ALTO_MAXIMO = { media: 125, carta: 130 };
 
 // Nada puede empujar una segunda hoja.
 const UNA_SOLA_HOJA =
@@ -30,18 +27,23 @@ const UNA_SOLA_HOJA =
 const PAPELES = {
   '58mm': '@page{margin:0} #print-area .tk{width:54mm;padding:2mm;font-size:9px}',
   '80mm': '@page{margin:0} #print-area .tk{width:74mm;padding:3mm;font-size:11px}',
-  // IMPORTANTE: ni «media» ni «carta» le dicen a la impresora de qué tamaño es la hoja.
-  // El tamaño lo manda el driver (lo que esté configurado en la impresora), y la factura
-  // simplemente se arma dentro de ese papel. Cuando la página imponía el tamaño con
-  // @page size, la Ricoh comparaba ese tamaño con el de la bandeja y rechazaba el trabajo;
-  // los equipos de oficina son estrictos con eso, a diferencia de una impresora sencilla.
+  // MEDIA CARTA. Dos decisiones aprendidas a golpes:
+  //  · No se declara el tamaño de la hoja, solo la orientación: las multifuncionales
+  //    comparan el tamaño del trabajo con el de la bandeja y rechazan lo que no cuadre.
+  //  · El bloque NO tiene alto fijo. Cuando lo tenía, si el área imprimible de la máquina
+  //    resultaba más corta que ese alto, el bloque no cabía y se partía en dos hojas: en
+  //    una los productos —empujados hacia abajo— y en la otra la firma. Ahora la factura
+  //    mide lo que mide su contenido y un script la encoge si se pasa del tope.
   media:
-    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('media')}}` +
+    `@page{size:landscape;margin:4mm 6mm} ${UNA_SOLA_HOJA}` +
+    ' #print-area .fx{width:100%;height:auto;overflow:visible;break-after:avoid;page-break-after:avoid}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:11px}',
-  // Igual, pero el bloque mide 13 cm y lleva la línea de corte para la hoja carta completa.
+  // HOJA CARTA completa: hay sitio de sobra, así que el bloque mantiene sus 13 cm y la
+  // línea punteada de corte siempre queda a la misma altura.
   carta:
-    `@page{margin:5mm 7mm} ${UNA_SOLA_HOJA} #print-area .fx{${cajaImpresion('carta')};` +
-    'border-bottom:1px dashed #999}' +
+    '@page{size:portrait;margin:5mm 7mm} ' + UNA_SOLA_HOJA +
+    ' #print-area .fx{width:100%;min-height:130mm;overflow:hidden;break-inside:avoid;' +
+    'page-break-inside:avoid;break-after:avoid;page-break-after:avoid;border-bottom:1px dashed #999}' +
     ' #print-area .tk{width:125mm;margin:0 auto;font-size:13px}',
 };
 
@@ -59,7 +61,8 @@ function papelCss(papel) {
     `padding:${esTicket ? '4mm 3mm' : '5mm 7mm'}}}` +
     (esTicket
       ? ''
-      : `@media screen{#print-area .fx{width:100%;height:${ALTO_IMPRESION[papel] || ALTO_IMPRESION.carta};overflow:hidden}}`);
+      : `@media screen{#print-area{min-height:${ALTO_PANTALLA[papel] || ALTO_PANTALLA.carta}}` +
+        ` #print-area .fx{width:100%;height:auto}}`);
 
   return pantalla + '@media print{' + regla + '}';
 }
@@ -88,7 +91,7 @@ function papelEfectivo(usuario, almacen) {
 }
 
 const NOMBRES_PAPEL = {
-  media: 'media carta (el tamaño lo pone la impresora)',
+  media: 'media carta acostada (8,5 de ancho)',
   carta: 'hoja carta (se corta a la mitad)',
   '80mm': 'ticket 80mm',
   '58mm': 'ticket 58mm',
@@ -111,7 +114,7 @@ function horaTexto(fechaHora) {
 
 module.exports = {
   PAPELES,
-  ALTO_IMPRESION,
+  ALTO_MAXIMO,
   NOMBRES_PAPEL,
   ALTO_PANTALLA,
   papelCss,

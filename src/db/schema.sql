@@ -110,6 +110,11 @@ CREATE TABLE IF NOT EXISTS documentos (
   UNIQUE (almacen_id, tipo, numero)
 );
 
+-- Rastro de las correcciones: una factura se puede editar, pero queda constancia.
+ALTER TABLE documentos ADD COLUMN IF NOT EXISTS editado_en TIMESTAMPTZ;
+ALTER TABLE documentos ADD COLUMN IF NOT EXISTS editado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+ALTER TABLE documentos ADD COLUMN IF NOT EXISTS ediciones INTEGER NOT NULL DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS documento_items (
   id SERIAL PRIMARY KEY,
   documento_id INTEGER NOT NULL REFERENCES documentos(id) ON DELETE CASCADE,

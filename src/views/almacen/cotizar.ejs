@@ -3,7 +3,15 @@
 <main class="ancho">
   <div class="vista-pos">
     <div class="trabajo">
-      <div id="espera" class="espera"></div>
+      <% if (editando) { %>
+        <div class="editando-aviso">
+          Estás corrigiendo la <%= editando.tipo === 'factura' ? 'factura' : 'cotización' %>
+          <b>N° <%= editando.numero %></b>. Conserva su número y su fecha.
+          <a href="/almacen/documentos?tipo=<%= editando.tipo %>">Cancelar</a>
+        </div>
+      <% } else { %>
+        <div id="espera" class="espera"></div>
+      <% } %>
       <div class="m2">
         <label class="campo">Metros cuadrados
           <input id="cM2" type="number" min="0" step="0.01" placeholder="0">
@@ -57,6 +65,7 @@ window.APP = {
   productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, precio: Number(p.precio_venta), existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
   metodos: [],
   almacenId: <%= almacen.id %>,
+  editando: <%- editando ? JSON.stringify(editando) : 'null' %>,
   almacen: <%- JSON.stringify({ nombre: almacen.nombre, encabezado: almacen.encabezado, direccion: almacen.direccion, nit: almacen.nit, telefono: almacen.telefono, nota: almacen.nota, papel: almacen.papel }) %>,
   numero: 0,
   vendedor: <%- JSON.stringify(usuario.nombre) %>,

@@ -6,7 +6,15 @@
 
   <div class="vista-pos">
     <div class="trabajo">
-      <div id="espera" class="espera"></div>
+      <% if (editando) { %>
+        <div class="editando-aviso">
+          Estás corrigiendo la <%= editando.tipo === 'factura' ? 'factura' : 'cotización' %>
+          <b>N° <%= editando.numero %></b>. Conserva su número y su fecha.
+          <a href="/almacen/documentos?tipo=<%= editando.tipo %>">Cancelar</a>
+        </div>
+      <% } else { %>
+        <div id="espera" class="espera"></div>
+      <% } %>
       <div class="buscador">
         <input id="buscar" type="text" autocomplete="off" spellcheck="false"
                placeholder="Buscar producto y presionar Enter" aria-label="Buscar producto">
@@ -60,6 +68,7 @@ window.APP = {
   productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, precio: Number(p.precio_venta), existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
   metodos: <%- JSON.stringify((almacen.metodos_pago || 'Efectivo,Transferencia').split(',').map(s => s.trim()).filter(Boolean)) %>,
   almacenId: <%= almacen.id %>,
+  editando: <%- editando ? JSON.stringify(editando) : 'null' %>,
   almacen: <%- JSON.stringify({ nombre: almacen.nombre, encabezado: almacen.encabezado, direccion: almacen.direccion, nit: almacen.nit, telefono: almacen.telefono, nota: almacen.nota, papel: almacen.papel }) %>,
   numero: <%= proximoNumero %>,
   vendedor: <%- JSON.stringify(usuario.nombre) %>,

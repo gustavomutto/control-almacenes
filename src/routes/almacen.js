@@ -10,6 +10,7 @@ const {
   papelEfectivo,
   densidadFactura,
   NOMBRES_PAPEL,
+  ALTO_MAXIMO,
 } = require('../lib/impresion');
 const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
 const { movimientoDelDia, ultimosDias, movimientoExcel } = require('../lib/movimiento');
@@ -56,6 +57,7 @@ router.get('/', async (req, res) => {
     almacen,
     papelNombre: NOMBRES_PAPEL[almacen.papel] || almacen.papel,
     productos: productos.rows,
+    editando: null,
     proximoNumero: proximo.rows[0].n,
     ultima: ultima.rows[0] || null,
     activo: 'facturar',
@@ -187,8 +189,188 @@ async function crearDocumento({ almacenId, usuarioId, tipo, cuerpo }) {
   }
 }
 
+// ============================ EDITAR UN DOCUMENTO ============================
+// Una factura mal hecha se corrige en vez de anularla y volverla a hacer: conserva su
+// número y su fecha. Por dentro es como deshacerla y rehacerla: se devuelve al inventario
+// lo que tenía, se descuenta lo nuevo y se vuelven a calcular totales, costo y ganancia.
+// Todo en una transacción, y queda registrado quién la editó y cuándo.
+
+// El personal del almacén solo corrige lo del día; admin y jefa, cualquier fecha.
+// Las cotizaciones no mueven inventario ni caja, así que se pueden corregir siempre.
+function puedeEditar(doc, usuario) {
+  if (doc.anulada) return 'Esa factura está anulada: ya no se puede editar.';
+  if (doc.tipo === 'cotizacion') return null;
+  if (usuario.rol !== 'almacen') return null;
+  const dia = doc.fecha instanceof Date
+    ? `${doc.fecha.getFullYear()}-${String(doc.fecha.getMonth() + 1).padStart(2, '0')}-${String(doc.fecha.getDate()).padStart(2, '0')}`
+    : String(doc.fecha).slice(0, 10);
+  if (dia !== hoyISO()) {
+    return 'Solo se pueden editar las facturas del día. Para una de otro día, pídeselo a la administración.';
+  }
+  return null;
+}
+
+async function cargarDocumentoEditable(almacenId, documentoId, usuario) {
+  const { rows } = await pool.query('SELECT * FROM documentos WHERE id = $1 AND almacen_id = $2', [
+    documentoId,
+    almacenId,
+  ]);
+  if (rows.length === 0) return { error: 'Documento no encontrado.' };
+
+  const impedimento = puedeEditar(rows[0], usuario);
+  if (impedimento) return { error: impedimento };
+
+  const [items, pagos] = await Promise.all([
+    pool.query('SELECT * FROM documento_items WHERE documento_id = $1 ORDER BY id', [documentoId]),
+    pool.query('SELECT * FROM documento_pagos WHERE documento_id = $1 ORDER BY id', [documentoId]),
+  ]);
+  return { doc: rows[0], items: items.rows, pagos: pagos.rows };
+}
+
+async function actualizarDocumento({ documentoId, almacenId, usuario, cuerpo }) {
+  const items = Array.isArray(cuerpo.items) ? cuerpo.items : [];
+  if (items.length === 0) throw new Error('No hay productos en el documento.');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: docs } = await client.query(
+      'SELECT * FROM documentos WHERE id = $1 AND almacen_id = $2 FOR UPDATE',
+      [documentoId, almacenId]
+    );
+    if (docs.length === 0) throw new Error('Documento no encontrado.');
+    const anterior = docs[0];
+
+    const impedimento = puedeEditar(anterior, usuario);
+    if (impedimento) throw new Error(impedimento);
+
+    // 1. Deshacer: lo que la factura había descontado vuelve al inventario.
+    if (anterior.tipo === 'factura') {
+      const { rows: viejos } = await client.query(
+        'SELECT producto_id, cantidad FROM documento_items WHERE documento_id = $1 AND producto_id IS NOT NULL',
+        [documentoId]
+      );
+      for (const i of viejos) {
+        await client.query(
+          'UPDATE productos SET existencias = existencias + $1 WHERE id = $2 AND controla_stock = true',
+          [i.cantidad, i.producto_id]
+        );
+      }
+    }
+    await client.query('DELETE FROM documento_items WHERE documento_id = $1', [documentoId]);
+    await client.query('DELETE FROM documento_pagos WHERE documento_id = $1', [documentoId]);
+
+    // 2. Rehacer, igual que si se estuviera facturando de nuevo.
+    const ids = items.map((i) => Number(i.producto_id)).filter((n) => Number.isInteger(n) && n > 0);
+    const costos = new Map();
+    const stock = new Map();
+    if (ids.length > 0) {
+      const { rows } = await client.query(
+        'SELECT id, precio_costo, existencias, controla_stock, nombre FROM productos WHERE almacen_id = $1 AND id = ANY($2::int[])',
+        [almacenId, ids]
+      );
+      for (const p of rows) {
+        costos.set(p.id, Number(p.precio_costo));
+        stock.set(p.id, p);
+      }
+    }
+
+    const preparados = items.map((i) => {
+      const cantidad = Number(i.cantidad) || 0;
+      const precio = Number(i.precio_unit) || 0;
+      const pid = Number(i.producto_id) || null;
+      return {
+        producto_id: pid && costos.has(pid) ? pid : null,
+        descripcion: String(i.descripcion || '').slice(0, 200) || 'Producto',
+        detalle: i.detalle ? String(i.detalle).slice(0, 80) : null,
+        cantidad,
+        precio_unit: precio,
+        costo_unit: pid && costos.has(pid) ? costos.get(pid) : 0,
+        total: cantidad * precio,
+      };
+    });
+
+    const tot = calcularTotales(preparados, cuerpo.descuento, cuerpo.iva);
+    const costoTotal = preparados.reduce((acc, i) => acc + i.costo_unit * i.cantidad, 0);
+    const margen = tot.subtotal - tot.descuento - costoTotal;
+
+    const pagos = anterior.tipo === 'factura' && Array.isArray(cuerpo.pagos) ? cuerpo.pagos : [];
+    const pagado = pagos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+    const cambio = anterior.tipo === 'factura' ? Math.max(0, pagado - tot.total) : 0;
+
+    await client.query(
+      `UPDATE documentos SET cliente = $1, m2 = $2, subtotal = $3, descuento = $4, iva = $5, total = $6,
+              costo_total = $7, margen = $8, cambio = $9,
+              editado_en = now(), editado_por = $10, ediciones = ediciones + 1
+       WHERE id = $11`,
+      [
+        String(cuerpo.cliente || '').slice(0, 160),
+        cuerpo.m2 ? Number(cuerpo.m2) : null,
+        tot.subtotal,
+        tot.descuento,
+        tot.iva,
+        tot.total,
+        costoTotal,
+        margen,
+        cambio,
+        usuario.id,
+        documentoId,
+      ]
+    );
+
+    for (const i of preparados) {
+      await client.query(
+        `INSERT INTO documento_items (documento_id, producto_id, descripcion, detalle, cantidad, precio_unit, costo_unit, total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [documentoId, i.producto_id, i.descripcion, i.detalle, i.cantidad, i.precio_unit, i.costo_unit, i.total]
+      );
+
+      if (anterior.tipo === 'factura' && i.producto_id && stock.get(i.producto_id)?.controla_stock) {
+        await client.query('UPDATE productos SET existencias = existencias - $1 WHERE id = $2', [
+          i.cantidad,
+          i.producto_id,
+        ]);
+        await client.query(
+          `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, documento_id, nota, registrado_por)
+           VALUES ($1,'ajuste',$2,$3,$4,$5)`,
+          [i.producto_id, -i.cantidad, documentoId, `Factura ${anterior.numero} editada`, usuario.id]
+        );
+      }
+    }
+
+    for (const p of pagos) {
+      const valor = Number(p.valor) || 0;
+      if (valor <= 0) continue;
+      await client.query('INSERT INTO documento_pagos (documento_id, metodo, valor) VALUES ($1,$2,$3)', [
+        documentoId,
+        String(p.metodo || 'Efectivo').slice(0, 40),
+        valor,
+      ]);
+    }
+
+    await client.query('COMMIT');
+    return { id: documentoId, numero: anterior.numero };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 router.post('/facturar', express.json({ limit: '256kb' }), async (req, res) => {
   try {
+    if (req.body.documento_id) {
+      const doc = await actualizarDocumento({
+        documentoId: req.body.documento_id,
+        almacenId: req.session.usuario.almacenId,
+        usuario: req.session.usuario,
+        cuerpo: req.body,
+      });
+      return res.json({ ok: true, id: doc.id, numero: doc.numero, imprimir: `/almacen/imprimir/${doc.id}` });
+    }
+
     const doc = await crearDocumento({
       almacenId: req.session.usuario.almacenId,
       usuarioId: req.session.usuario.id,
@@ -221,6 +403,7 @@ router.get('/cotizar', async (req, res) => {
     almacen,
     papelNombre: NOMBRES_PAPEL[almacen.papel] || almacen.papel,
     productos: productos.rows,
+    editando: null,
     materialesM2: MATERIALES_M2,
     activo: 'cotizar',
   });
@@ -228,6 +411,16 @@ router.get('/cotizar', async (req, res) => {
 
 router.post('/cotizar', express.json({ limit: '256kb' }), async (req, res) => {
   try {
+    if (req.body.documento_id) {
+      const doc = await actualizarDocumento({
+        documentoId: req.body.documento_id,
+        almacenId: req.session.usuario.almacenId,
+        usuario: req.session.usuario,
+        cuerpo: req.body,
+      });
+      return res.json({ ok: true, id: doc.id, numero: doc.numero, imprimir: `/almacen/imprimir/${doc.id}` });
+    }
+
     const doc = await crearDocumento({
       almacenId: req.session.usuario.almacenId,
       usuarioId: req.session.usuario.id,
@@ -265,13 +458,127 @@ router.get('/documentos', async (req, res) => {
 
   res.render('almacen/documentos', {
     almacen,
-    documentos: docs.rows,
+    documentos: docs.rows.map((d) => ({ ...d, editable: !puedeEditar(d, req.session.usuario) })),
+    metodos: (almacen.metodos_pago || 'Efectivo,Transferencia').split(',').map((m) => m.trim()).filter(Boolean),
     fecha,
     tipo,
     total,
     hoy: hoyISO(),
     activo: 'documentos',
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
   });
+});
+
+// Abrir una factura o cotización en la pantalla de venta, para corregirla.
+router.get('/documentos/:id/editar', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const datos = await cargarDocumentoEditable(almacenId, req.params.id, req.session.usuario);
+  if (datos.error) {
+    return res.redirect('/almacen/documentos?error=' + encodeURIComponent(datos.error));
+  }
+
+  const { doc, items, pagos } = datos;
+  const [almacen, productos] = await Promise.all([
+    cargarAlmacen(almacenId),
+    pool.query(
+      `SELECT id, nombre, unidad, precio_venta, existencias, controla_stock
+       FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+      [almacenId]
+    ),
+  ]);
+  almacen.papel = papelEfectivo(req.session.usuario, almacen);
+
+  const editando = {
+    id: doc.id,
+    numero: doc.numero,
+    tipo: doc.tipo,
+    cliente: doc.cliente,
+    descuento: Number(doc.descuento) || 0,
+    iva: Number(doc.iva) > 0,
+    m2: doc.m2 ? Number(doc.m2) : null,
+    items: items.map((i) => ({
+      producto_id: i.producto_id,
+      descripcion: i.descripcion,
+      detalle: i.detalle,
+      cantidad: Number(i.cantidad),
+      precio: Number(i.precio_unit),
+    })),
+    pagos: pagos.map((p) => ({ metodo: p.metodo, valor: Number(p.valor) })),
+  };
+
+  const comunes = {
+    almacen,
+    papelNombre: NOMBRES_PAPEL[almacen.papel] || almacen.papel,
+    productos: productos.rows,
+    editando,
+    mensaje: null,
+    error: null,
+  };
+
+  if (doc.tipo === 'cotizacion') {
+    return res.render('almacen/cotizar', { ...comunes, materialesM2: MATERIALES_M2, activo: 'cotizar' });
+  }
+  res.render('almacen/facturar', {
+    ...comunes,
+    proximoNumero: doc.numero,
+    ultima: { id: doc.id, numero: doc.numero },
+    activo: 'facturar',
+  });
+});
+
+// Cambiar solo la forma de pago: no toca inventario ni totales, solo cómo se pagó.
+router.post('/documentos/:id/pagos', async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const volver = `/almacen/documentos?fecha=${req.body.fecha || hoyISO()}`;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      "SELECT * FROM documentos WHERE id = $1 AND almacen_id = $2 AND tipo = 'factura' FOR UPDATE",
+      [req.params.id, almacenId]
+    );
+    if (rows.length === 0) throw new Error('Factura no encontrada.');
+    const doc = rows[0];
+    const impedimento = puedeEditar(doc, req.session.usuario);
+    if (impedimento) throw new Error(impedimento);
+
+    // Llegan como metodo_1..n y valor_1..n; el valor vacío toma el total de la factura.
+    const metodos = [];
+    for (let i = 1; i <= 4; i++) {
+      const metodo = String(req.body[`metodo_${i}`] || '').trim();
+      const valor = Number(req.body[`valor_${i}`]);
+      if (!metodo || !(valor > 0)) continue;
+      metodos.push({ metodo: metodo.slice(0, 40), valor });
+    }
+    if (metodos.length === 0) throw new Error('Escribe al menos una forma de pago con su valor.');
+
+    const pagado = metodos.reduce((a, p) => a + p.valor, 0);
+    if (pagado + 0.01 < Number(doc.total)) {
+      throw new Error(`Los pagos suman ${pagado.toLocaleString('es-CO')} y la factura es de ${Number(doc.total).toLocaleString('es-CO')}.`);
+    }
+
+    await client.query('DELETE FROM documento_pagos WHERE documento_id = $1', [doc.id]);
+    for (const p of metodos) {
+      await client.query('INSERT INTO documento_pagos (documento_id, metodo, valor) VALUES ($1,$2,$3)', [
+        doc.id,
+        p.metodo,
+        p.valor,
+      ]);
+    }
+    await client.query(
+      'UPDATE documentos SET cambio = $1, editado_en = now(), editado_por = $2, ediciones = ediciones + 1 WHERE id = $3',
+      [Math.max(0, pagado - Number(doc.total)), req.session.usuario.id, doc.id]
+    );
+    await client.query('COMMIT');
+    res.redirect(volver + '&ok=' + encodeURIComponent(`Forma de pago de la factura ${doc.numero} actualizada.`));
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.redirect(volver + '&error=' + encodeURIComponent(err.message));
+  } finally {
+    client.release();
+  }
 });
 
 router.post('/documentos/:id/anular', async (req, res) => {
@@ -802,6 +1109,7 @@ router.get('/imprimir/:id', async (req, res) => {
     papel,
     papelNombre: NOMBRES_PAPEL[papel] || papel,
     densidad: densidadFactura(items.length),
+    altoMaximo: ALTO_MAXIMO[papel] || ALTO_MAXIMO.carta,
     papelCss: papelCss(papel),
     hora: horaTexto(doc.creado_en),
     fechaTexto: fechaTexto(doc.fecha),

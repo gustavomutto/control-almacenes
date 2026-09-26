@@ -1,6 +1,9 @@
 <%- include('../partials/head', { titulo: 'Facturas — ' + almacen.nombre }) %>
 <%- include('../partials/barra', { usuario, activo: 'documentos' }) %>
 <main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
   <div class="panel">
     <div class="fila-filtro">
       <div>
@@ -25,7 +28,7 @@
 
     <table class="tabla">
       <thead>
-        <tr><th>N°</th><th>Cliente</th><th>Vendedor</th><th>Pagos</th><th class="n">Total</th><th></th></tr>
+        <tr><th>N°</th><th>Cliente</th><th>Vendedor</th><th>Forma de pago</th><th class="n">Total</th><th></th></tr>
       </thead>
       <tbody>
         <% documentos.forEach(d => { %>
@@ -33,16 +36,39 @@
             <td><%= d.numero %><%= d.anulada ? ' (anulada)' : '' %></td>
             <td><%= d.cliente || 'Consumidor final' %></td>
             <td><%= d.vendedor || '—' %></td>
-            <td><%= d.pagos || '—' %></td>
+            <td>
+              <% if (tipo === 'factura' && d.editable) { %>
+                <form method="post" action="/almacen/documentos/<%= d.id %>/pagos" class="pago-rapido">
+                  <input type="hidden" name="fecha" value="<%= fecha %>">
+                  <select name="metodo_1">
+                    <% metodos.forEach(m => { %><option <%= (d.pagos || '').startsWith(m) ? 'selected' : '' %>><%= m %></option><% }) %>
+                  </select>
+                  <input class="in n" type="number" name="valor_1" min="0" step="1" value="<%= Math.round(Number(d.total)) %>">
+                  <select name="metodo_2">
+                    <option value="">— y algo más…</option>
+                    <% metodos.forEach(m => { %><option><%= m %></option><% }) %>
+                  </select>
+                  <input class="in n" type="number" name="valor_2" min="0" step="1" placeholder="0">
+                  <button class="btn linea mini" type="submit">Guardar pago</button>
+                </form>
+                <small class="ayuda" style="margin:0"><%= d.pagos || 'sin registrar' %></small>
+              <% } else { %>
+                <%= d.pagos || '—' %>
+              <% } %>
+            </td>
             <td class="n"><%= fmt(d.total) %></td>
             <td class="n">
               <a class="btn linea mini" href="/almacen/imprimir/<%= d.id %>?auto=0">Ver / imprimir</a>
+              <% if (d.editable) { %>
+                <a class="btn linea mini" href="/almacen/documentos/<%= d.id %>/editar">Editar</a>
+              <% } %>
               <% if (tipo === 'factura' && !d.anulada) { %>
                 <form method="post" action="/almacen/documentos/<%= d.id %>/anular" style="display:inline"
                       onsubmit="return confirm('¿Anular esta factura? El inventario se devuelve.')">
                   <button class="btn peligro mini" type="submit">Anular</button>
                 </form>
               <% } %>
+              <% if (d.ediciones > 0) { %><small class="ayuda" style="margin:0">editada <%= d.ediciones %> vez(ces)</small><% } %>
             </td>
           </tr>
         <% }) %>

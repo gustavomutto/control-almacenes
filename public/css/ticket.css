@@ -64,7 +64,7 @@
 .fx.d4 tbody td{padding:.1em .4em}
 .fx.d5 tbody td{padding:.02em .35em}
 .fx.d4 .fx-resumen,.fx.d5 .fx-resumen{margin-top:.4em}
-.fx.d4 .fx-cierre,.fx.d5 .fx-cierre{padding-top:.4em}
+.fx.d4 .fx-cierre,.fx.d5 .fx-cierre{padding-top:.4em;margin-top:5mm}
 .fx.d4 .fx-nota,.fx.d5 .fx-nota{display:none}
 .fx.d5 .fx-firma{min-width:12em}
 
@@ -82,7 +82,7 @@
 .fx-cliente span{color:#555;margin-right:.3em}
 
 /* Cuerpo: productos + pago + total, 11 cm */
-.fx-cuerpo{flex:1;display:flex;flex-direction:column;min-height:0}
+.fx-cuerpo{display:flex;flex-direction:column;min-height:0}
 .fx table{width:100%;border-collapse:collapse;margin-top:.5em}
 .fx thead th{font-size:.82em;text-transform:uppercase;letter-spacing:.03em;color:#555;
   text-align:right;padding:0 .5em .3em;border-bottom:1.5px solid #111}
@@ -101,7 +101,7 @@
 .fx-totales i{grid-column:1/-1;border-top:1.5px solid #111;margin-top:.3em}
 .fx-totales .fx-total{font-size:1.3em;font-weight:700;padding-top:.2em}
 
-.fx-cierre{display:flex;justify-content:space-between;align-items:flex-end;gap:2em;margin-top:auto;padding-top:.8em}
+.fx-cierre{display:flex;justify-content:space-between;align-items:flex-end;gap:2em;margin-top:8mm;padding-top:.8em}
 .fx-firma{border-top:1px solid #111;text-align:center;padding-top:.2em;font-size:.85em;color:#555;min-width:16em}
 .fx-mensaje{margin:0;font-size:.88em;color:#333;text-align:right;line-height:1.4}
 .fx-nota{font-size:.88em;color:#333;padding-top:.5em}
