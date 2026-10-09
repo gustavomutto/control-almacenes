@@ -1,0 +1,130 @@
+<%- include('../partials/head', { titulo: 'Cajas de todos los almacenes' }) %>
+<%- include('../partials/barra', { usuario, activo: 'cajas' }) %>
+<main>
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Cajas de todos los almacenes</h2>
+        <p class="ayuda" style="margin:0">
+          <% if (desde === hasta) { %>
+            Cierre del <%= desde %>.
+          <% } else { %>
+            Del <%= desde %> al <%= hasta %>.
+          <% } %>
+          Lo mismo que cada almacén ve en su pantalla «Caja», pero todo junto.
+        </p>
+      </div>
+      <form method="get" action="/jefa/cajas" style="margin-left:auto;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <label class="campo">Desde <input type="date" name="desde" value="<%= desde %>" max="<%= hoy %>"></label>
+        <label class="campo">Hasta <input type="date" name="hasta" value="<%= hasta %>" max="<%= hoy %>"></label>
+        <button class="btn prim" type="submit">Ver</button>
+        <a class="btn linea" href="/jefa/cajas?desde=<%= hoy %>&hasta=<%= hoy %>">Hoy</a>
+      </form>
+    </div>
+
+    <div class="tarjetas">
+      <div class="tarjeta venta"><span>Venta total</span><strong><%= fmt(resumen.totales.venta) %></strong></div>
+      <div class="tarjeta"><span>Transferencia</span><strong><%= fmt(resumen.totales.transferencia) %></strong></div>
+      <div class="tarjeta"><span>Efectivo cobrado</span><strong><%= fmt(resumen.totales.efectivo) %></strong></div>
+      <div class="tarjeta gastos"><span>Gastos pagados</span><strong><%= fmt(resumen.totales.gastos) %></strong></div>
+      <div class="tarjeta neta"><span>Efectivo a entregar</span><strong><%= fmt(resumen.totales.entregar) %></strong></div>
+    </div>
+
+    <p class="ayuda" style="margin:0">
+      <b>Efectivo a entregar</b> es el efectivo cobrado menos los gastos que se pagaron de esa caja;
+      la transferencia no se entrega porque ya está en el banco.
+      <a href="/jefa/cajas/excel?desde=<%= desde %>&hasta=<%= hasta %>">Descargar en Excel</a>
+    </p>
+  </div>
+
+  <div class="panel">
+    <table class="tabla tabla-cajas">
+      <thead>
+        <tr>
+          <th>Almacén / caja</th>
+          <th class="n">Facturas</th>
+          <th class="n">Venta total</th>
+          <th class="n">Transferencia</th>
+          <th class="n">Efectivo</th>
+          <% if (resumen.conOtros) { %><th class="n">Otros pagos</th><% } %>
+          <th class="n">Gastos</th>
+          <th class="n">Efectivo a entregar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% let conMovimiento = 0 %>
+        <% resumen.filas.forEach(f => { %>
+          <% if (f.cajas.length === 0) { return } %>
+          <% conMovimiento++ %>
+          <tr class="fila-almacen">
+            <td>
+              <b><%= f.almacen.nombre %></b>
+              <% if (f.almacen.region_nombre) { %><small class="ayuda"> · <%= f.almacen.region_nombre %></small><% } %>
+            </td>
+            <td class="n"><%= f.total.facturas %></td>
+            <td class="n"><b><%= fmt(f.total.venta) %></b></td>
+            <td class="n"><%= fmt(f.total.transferencia) %></td>
+            <td class="n"><%= fmt(f.total.efectivo) %></td>
+            <% if (resumen.conOtros) { %><td class="n"><%= fmt(f.total.otros) %></td><% } %>
+            <td class="n"><%= fmt(f.total.gastos) %></td>
+            <td class="n"><b><%= fmt(f.total.entregar) %></b></td>
+          </tr>
+          <% f.cajas.forEach(c => { %>
+            <tr class="fila-caja<%= c.venta === 0 && c.gastos === 0 ? ' sin-venta' : '' %>">
+              <td>
+                <span class="sangria"><%= c.nombre %></span>
+                <% if (c.usuario) { %><small class="ayuda">(<%= c.usuario %>)</small><% } %>
+                <% if (c.ajena) { %><small class="etiqueta">administración</small><% } %>
+              </td>
+              <td class="n"><%= c.facturas %></td>
+              <td class="n"><%= fmt(c.venta) %></td>
+              <td class="n"><%= fmt(c.transferencia) %></td>
+              <td class="n"><%= fmt(c.efectivo) %></td>
+              <% if (resumen.conOtros) { %><td class="n"><%= fmt(c.otros) %></td><% } %>
+              <td class="n"><%= fmt(c.gastos) %></td>
+              <td class="n"><%= fmt(c.entregar) %></td>
+            </tr>
+          <% }) %>
+        <% }) %>
+        <% if (conMovimiento === 0) { %>
+          <tr><td colspan="<%= resumen.conOtros ? 8 : 7 %>" class="vacio">
+            Ningún almacén movió caja en <%= desde === hasta ? 'esta fecha' : 'estas fechas' %>.
+          </td></tr>
+        <% } %>
+      </tbody>
+      <% if (conMovimiento > 0) { %>
+        <tfoot>
+          <tr>
+            <td>Total de todos los almacenes</td>
+            <td class="n"><%= resumen.totales.facturas %></td>
+            <td class="n"><%= fmt(resumen.totales.venta) %></td>
+            <td class="n"><%= fmt(resumen.totales.transferencia) %></td>
+            <td class="n"><%= fmt(resumen.totales.efectivo) %></td>
+            <% if (resumen.conOtros) { %><td class="n"><%= fmt(resumen.totales.otros) %></td><% } %>
+            <td class="n"><%= fmt(resumen.totales.gastos) %></td>
+            <td class="n"><%= fmt(resumen.totales.entregar) %></td>
+          </tr>
+        </tfoot>
+      <% } %>
+    </table>
+
+    <% const quietos = resumen.filas.filter(f => f.cajas.length === 0).map(f => f.almacen.nombre) %>
+    <% if (quietos.length && conMovimiento > 0) { %>
+      <p class="ayuda" style="margin-top:14px">
+        Sin movimiento <%= desde === hasta ? 'este día' : 'en estas fechas' %>:
+        <%= quietos.join(', ') %>.
+      </p>
+    <% } %>
+
+    <p class="ayuda" style="margin-top:14px">
+      Cada usuario que factura es una caja. Las cajas que aparecen en cero son las que no
+      facturaron ese día.
+      <% if (resumen.otrosMetodos.length) { %>
+        En «Otros pagos» entró lo cobrado como <%= resumen.otrosMetodos.join(', ') %>.
+      <% } %>
+      Las facturas anuladas no cuentan, y las bodegas no aparecen porque no venden.
+    </p>
+  </div>
+</main>
+</body>
+</html>

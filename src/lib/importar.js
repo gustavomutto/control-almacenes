@@ -211,4 +211,57 @@ function valorizacionExcel(valor, { nombre, porcentaje }) {
   return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
 }
 
-module.exports = { leerInventario, plantillaExcel, inventarioExcel, valorizacionExcel, aNumero, aBooleano };
+// Las cajas de todos los almacenes, como las ve administración, para guardarlas o imprimirlas.
+function cajasExcel(resumen, { desde, hasta }) {
+  const titulo = desde === hasta ? desde : `${desde} a ${hasta}`;
+  const linea = (quien, c, esTotal) => ({
+    almacen: quien.almacen,
+    caja: quien.caja,
+    facturas: c.facturas,
+    venta: Math.round(c.venta),
+    efectivo: Math.round(c.efectivo),
+    transferencia: Math.round(c.transferencia),
+    otros: Math.round(c.otros),
+    gastos: Math.round(c.gastos),
+    efectivo_a_entregar: Math.round(c.entregar),
+    _total: esTotal || false,
+  });
+
+  const datos = [];
+  for (const f of resumen.filas) {
+    if (f.cajas.length === 0) continue; // los almacenes que no movieron caja no ensucian la hoja
+    datos.push(linea({ almacen: f.almacen.nombre, caja: 'TODO EL ALMACÉN' }, f.total, true));
+    for (const c of f.cajas) {
+      const quien = c.nombre + (c.usuario ? ` (${c.usuario})` : '') + (c.ajena ? ' — administración' : '');
+      datos.push(linea({ almacen: '', caja: quien }, c));
+    }
+    datos.push({});
+  }
+  datos.push(linea({ almacen: `TOTAL ${titulo}`, caja: '' }, resumen.totales, true));
+
+  const hoja = XLSX.utils.json_to_sheet(datos.map(({ _total, ...resto }) => resto));
+  hoja['!cols'] = [
+    { wch: 24 },
+    { wch: 26 },
+    { wch: 10 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 15 },
+    { wch: 12 },
+    { wch: 12 },
+    { wch: 20 },
+  ];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Cajas');
+  return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
+}
+
+module.exports = {
+  leerInventario,
+  plantillaExcel,
+  inventarioExcel,
+  valorizacionExcel,
+  cajasExcel,
+  aNumero,
+  aBooleano,
+};

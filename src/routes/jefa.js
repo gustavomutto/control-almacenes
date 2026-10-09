@@ -3,10 +3,11 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
-const { plantillaExcel, inventarioExcel, valorizacionExcel } = require('../lib/importar');
+const { plantillaExcel, inventarioExcel, valorizacionExcel, cajasExcel } = require('../lib/importar');
 const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
 const { detectarInvertidos, repararInvertidos, repararCostos } = require('../lib/reparar');
 const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
+const { resumenCajas } = require('../lib/cajas');
 const { papelCss, fechaTexto, horaTexto, papelEfectivo } = require('../lib/impresion');
 
 const router = express.Router();
@@ -108,6 +109,38 @@ router.get('/', async (req, res) => {
     totalUnidadesHoy: totalUnidades,
     activo: 'panel',
   });
+});
+
+// ======================= CAJAS DE TODOS LOS ALMACENES =======================
+// Lo mismo que cada almacén ve en su pantalla «Caja», pero de todos a la vez y caja por caja.
+// Solo entra aquí quien administra (este router ya no deja entrar al personal del almacén).
+
+function rangoCajas(req) {
+  const hoy = hoyISO();
+  const desde = (req.query.desde || req.query.fecha || hoy).slice(0, 10);
+  const hasta = (req.query.hasta || req.query.fecha || desde).slice(0, 10);
+  return desde <= hasta ? { desde, hasta } : { desde: hasta, hasta: desde };
+}
+
+router.get('/cajas', async (req, res) => {
+  const { desde, hasta } = rangoCajas(req);
+  const resumen = await resumenCajas(pool, { desde, hasta });
+  res.render('jefa/cajas', {
+    resumen,
+    desde,
+    hasta,
+    hoy: hoyISO(),
+    activo: 'cajas',
+  });
+});
+
+router.get('/cajas/excel', async (req, res) => {
+  const { desde, hasta } = rangoCajas(req);
+  const resumen = await resumenCajas(pool, { desde, hasta });
+  const archivo = `cajas_${desde}${desde === hasta ? '' : '_a_' + hasta}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+  res.send(cajasExcel(resumen, { desde, hasta }));
 });
 
 // ======================= REPORTE MENSUAL =======================

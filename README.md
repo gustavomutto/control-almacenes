@@ -11,6 +11,7 @@ Sistema web para varios almacenes. Cada almacén tiene su propio sitio de factur
 | Inventario y precios de venta | Sí (su almacén) | Consulta | Consulta |
 | **Precio de costo y ganancia** | **No lo ve nunca** | Sí | Sí |
 | Reportes de todos los almacenes | No | Sí | Sí |
+| **Cajas de todos los almacenes (qué entregan)** | **Solo la suya** | Sí | Sí |
 | Trasladar mercancía a otro almacén | Sí (desde el suyo) | Sí (desde cualquiera) | Sí (desde cualquiera) |
 | Manejar la bodega enlazada a su almacén | Sí (entradas y despachos) | Sí | Sí |
 | **Cuánto vale la mercancía de la bodega** | **No lo ve** | Sí | Sí |
@@ -70,6 +71,29 @@ mismo historial.
 Ni siquiera un borrado real en la base de datos cambiaría una factura: la referencia al
 producto es `ON DELETE SET NULL`, así que la línea se quedaría con su descripción y su total,
 solo sin el enlace al producto. Aun así el sistema nunca borra productos: solo los desactiva.
+
+## Cajas de todos los almacenes (administración)
+
+La pestaña **«Cajas»** solo aparece para quien administra (jefa y administrador); el personal
+del almacén no entra ahí —si escribe la dirección a mano, el sistema le responde 403—. Muestra,
+de todos los almacenes al tiempo:
+
+| | |
+|---|---|
+| **Venta total** | lo facturado, sin contar facturas anuladas |
+| **Transferencia** | lo que entró al banco |
+| **Efectivo** | lo que entró en billetes |
+| **Otros pagos** | solo aparece si algún almacén cobró con una forma de pago distinta (datáfono, etc.) |
+| **Gastos** | lo que se pagó de esa caja |
+| **Efectivo a entregar** | efectivo − gastos, igual que en el cierre del almacén |
+
+Debajo de cada almacén va **caja por caja** (cada usuario que factura es una caja), así se ve
+quién vendió cuánto y cuánto debe entregar cada uno; las cajas que no facturaron aparecen en
+cero. Un gasto anotado desde administración sale marcado como tal, para que el cuadre siga
+sumando. Se puede ver un día o un rango de fechas, y descargar todo en Excel.
+
+Los números son exactamente los mismos que ve cada almacén en su pantalla «Caja»: la cuenta se
+hace una sola vez, así que no hay dos verdades.
 
 ## Varias facturas abiertas a la vez
 
@@ -357,6 +381,7 @@ src/
   lib/impresion.js                 reglas de papel (media carta / carta / 80mm / 58mm)
   lib/inventario.js                cargar inventario desde Excel (con o sin costos)
   lib/reparar.js                   arreglo de precios invertidos y recálculo de facturas
+  lib/cajas.js                     cajas de todos los almacenes (lo que entregan)
   lib/traslados.js                 mercancía que pasa de un almacén a otro
   lib/movimiento.js                material vendido, trasladado y recibido en el día
   db/schema.sql                    estructura de la base de datos (Postgres)

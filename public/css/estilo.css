@@ -187,3 +187,10 @@ tr.anulada td{opacity:.55;text-decoration:line-through}
 @keyframes resaltar{from{background:#DFF3E3}to{background:transparent}}
 .tabla tr.resaltado td{animation:resaltar 1.2s ease-out}
 #avisoCatalogo{margin-bottom:14px}
+
+/* ---- Cajas de todos los almacenes (administración) ---- */
+.tabla-cajas tr.fila-almacen td{background:#F7F9FB;border-top:2px solid var(--line)}
+.tabla-cajas tr.fila-caja td:first-child{padding-left:26px}
+.tabla-cajas tr.fila-caja.sin-venta td{color:var(--steel)}
+.tabla-cajas .sangria{font-weight:500}
+.tabla-cajas tfoot td{font-weight:700;background:#EEF3F7}
