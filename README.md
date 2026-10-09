@@ -29,8 +29,9 @@ administración y la ganancia se calcula solo para ellos.
   sueltos. Las cotizaciones no mueven inventario.
 - **Facturas**: historial por día, reimprimir, **editar**, cambiar la forma de pago y anular
   (al anular, el inventario se devuelve).
-- **Productos**: catálogo con precio de venta, unidad y existencias; registrar entradas de
-  mercancía, y cargar el inventario desde Excel (se descarga como está hoy, se llena y se sube).
+- **Productos**: catálogo con precio de venta, unidad y existencias; buscador, edición en la
+  misma fila, entradas de mercancía y carga del inventario desde Excel (se descarga como está
+  hoy, se llena y se sube). Nada de esto recarga la pantalla.
 - **Traslados**: hoja para mandar mercancía a otro almacén, sin precios. Sale del inventario de
   aquí y entra al de allá.
 - **Movimiento**: qué material salió hoy —vendido, trasladado— y qué entró, imprimible.
@@ -38,6 +39,37 @@ administración y la ganancia se calcula solo para ellos.
   (efectivo cobrado menos gastos), con cierre imprimible.
 - **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
   impresos.
+
+## El catálogo de productos
+
+La pantalla «Productos» (y la de la bodega, que es la misma) trabaja sin recargar la página:
+
+- **Buscador**: filtra mientras escribes, sin tildes y por palabras — «tub 1/2» encuentra
+  «Tubo PVC 1/2». `Esc` limpia la búsqueda.
+- **Editar en la misma fila**: el nombre, la unidad, el precio de venta y si descuenta
+  inventario se cambian ahí mismo. `Enter` guarda, `Esc` cancela. Las existencias no se tocan
+  al editar: para eso está «Entró». Si el nombre nuevo ya lo tiene otro producto, avisa en vez
+  de romperse.
+- **Entró**: se anota la cantidad y la fila se actualiza sola, dejando el movimiento registrado.
+- **Quitar** y **Devolver**: ver abajo.
+- Todo lo que pasa se avisa en una línea arriba de la tabla, y la fila que cambió se resalta
+  un segundo.
+
+Si el navegador no tiene JavaScript, la pantalla sigue funcionando con los formularios de
+siempre (recargando, como antes).
+
+### «Quitar» no borra: desactiva
+
+Cuando quitas un producto, el sistema hace `activo = false`. El producto desaparece del
+catálogo y de la búsqueda al facturar, pero **nada de lo ya hecho se mueve**: cada línea de
+factura guarda su propia copia de la descripción, la cantidad, el precio, el costo y el total
+(tabla `documento_items`), así que los totales, la caja y los reportes quedan exactos. Marcando
+«Ver los quitados» aparecen tachados y con el botón **Devolver** vuelven al catálogo con su
+mismo historial.
+
+Ni siquiera un borrado real en la base de datos cambiaría una factura: la referencia al
+producto es `ON DELETE SET NULL`, así que la línea se quedaría con su descripción y su total,
+solo sin el enlace al producto. Aun así el sistema nunca borra productos: solo los desactiva.
 
 ## Varias facturas abiertas a la vez
 
@@ -342,6 +374,7 @@ public/css/ticket.css               formato del ticket/factura impresa
 public/js/pos.js                    pantalla de venta
 public/js/cotizar.js                pantalla de cotización
 public/js/espera.js                 varias facturas abiertas a la vez
+public/js/catalogo.js               productos y bodega sin recargar (buscador y edición)
 ```
 
 ## Desplegar en Railway

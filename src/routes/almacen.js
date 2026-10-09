@@ -32,9 +32,214 @@ router.use(async (req, res, next) => {
   next();
 });
 
+// Las pantallas de catálogo trabajan sin recargar: mandan la petición por detrás y
+// esperan JSON. Si alguien entra sin JavaScript, se responde con la redirección de siempre.
+function pideJson(req) {
+  return req.get('X-Requested-With') === 'fetch';
+}
+
+function responder(req, res, { json, destino, ok, error }) {
+  if (pideJson(req)) {
+    if (error) return res.status(400).json({ ok: false, error });
+    return res.json({ ok: true, ...json });
+  }
+  const sep = destino.includes('?') ? '&' : '?';
+  res.redirect(destino + sep + (error ? 'error=' : 'ok=') + encodeURIComponent(error || ok));
+}
+
+// Un producto tal como lo necesita la tabla del catálogo. Los numeric de Postgres llegan
+// como texto; aquí quedan como números para que el navegador pueda formatearlos.
+function comoFila(p) {
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    unidad: p.unidad,
+    precio_venta: Number(p.precio_venta),
+    existencias: Number(p.existencias),
+    controla_stock: p.controla_stock,
+    activo: p.activo,
+  };
+}
+
+async function leerProducto(id) {
+  const { rows } = await pool.query('SELECT * FROM productos WHERE id = $1', [id]);
+  return rows.length === 0 ? null : comoFila(rows[0]);
+}
+
+async function catalogoDe(almacenId) {
+  const { rows } = await pool.query('SELECT * FROM productos WHERE almacen_id = $1 ORDER BY activo DESC, nombre', [
+    almacenId,
+  ]);
+  return rows.map(comoFila);
+}
+
 async function cargarAlmacen(almacenId) {
   const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1', [almacenId]);
   return rows[0];
+}
+
+function verdadero(v) {
+  return v !== undefined && v !== null && v !== false && v !== 'false' && v !== '0' && v !== '';
+}
+
+// Las operaciones del catálogo (agregar, editar, entrada, quitar y devolver) son las mismas en
+// el almacén y en la bodega: solo cambian a qué almacén apuntan y si se maneja precio de venta.
+// Todas contestan JSON cuando la pantalla las llama por detrás, para no recargar la página.
+function montarCatalogo({ prefijo, destino, lugar, conPrecio, almacenDe, previos = [] }) {
+  const pasos = [...previos, express.json()];
+
+  function fallo(req, res, err) {
+    const error = err && err.code === '23505' ? 'Ya hay otro producto con ese nombre.' : err.message;
+    responder(req, res, { destino, error });
+  }
+
+  // Agregar. Si ya existe uno con el mismo nombre no se duplica: se actualiza, y sus
+  // existencias no se tocan (para eso está «Entró»).
+  router.post(prefijo, pasos, async (req, res) => {
+    try {
+      const nombre = String(req.body.nombre || '').trim();
+      if (!nombre) return responder(req, res, { destino, error: 'El producto necesita un nombre.' });
+
+      // El personal del almacén NO define el precio de costo; eso lo hacen admin/jefa.
+      const { rows } = await pool.query(
+        `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, existencias, controla_stock)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (almacen_id, nombre) DO UPDATE
+           SET unidad = EXCLUDED.unidad,
+               precio_venta = CASE WHEN $7 THEN EXCLUDED.precio_venta ELSE productos.precio_venta END,
+               controla_stock = EXCLUDED.controla_stock, activo = true, actualizado_en = now()
+         RETURNING id, (xmax = 0) AS fue_creado`,
+        [
+          almacenDe(req),
+          nombre,
+          String(req.body.unidad || 'unidad').trim(),
+          conPrecio ? Number(req.body.precio_venta) || 0 : 0,
+          Number(req.body.existencias) || 0,
+          verdadero(req.body.controla_stock),
+          conPrecio,
+        ]
+      );
+
+      responder(req, res, {
+        destino,
+        ok: 'Producto guardado.',
+        json: {
+          producto: await leerProducto(rows[0].id),
+          mensaje: rows[0].fue_creado ? `«${nombre}» agregado.` : `«${nombre}» actualizado.`,
+        },
+      });
+    } catch (err) {
+      fallo(req, res, err);
+    }
+  });
+
+  // Editar sin tocar nada del pasado: las facturas ya hechas guardan su propia copia de la
+  // descripción y del precio, así que cambiar el nombre o el precio aquí no las altera.
+  router.post(`${prefijo}/:id/editar`, pasos, async (req, res) => {
+    try {
+      const nombre = String(req.body.nombre || '').trim();
+      if (!nombre) return responder(req, res, { destino, error: 'El producto necesita un nombre.' });
+
+      const { rows } = await pool.query(
+        `UPDATE productos
+            SET nombre = $1, unidad = $2,
+                precio_venta = CASE WHEN $3 THEN $4 ELSE precio_venta END,
+                controla_stock = $5, actualizado_en = now()
+          WHERE id = $6 AND almacen_id = $7
+          RETURNING id`,
+        [
+          nombre,
+          String(req.body.unidad || 'unidad').trim(),
+          conPrecio,
+          conPrecio ? Number(req.body.precio_venta) || 0 : 0,
+          verdadero(req.body.controla_stock),
+          req.params.id,
+          almacenDe(req),
+        ]
+      );
+      if (rows.length === 0) return responder(req, res, { destino, error: 'Producto no encontrado.' });
+
+      responder(req, res, {
+        destino,
+        ok: 'Producto actualizado.',
+        json: { producto: await leerProducto(rows[0].id), mensaje: `«${nombre}» actualizado.` },
+      });
+    } catch (err) {
+      fallo(req, res, err);
+    }
+  });
+
+  router.post(`${prefijo}/:id/entrada`, pasos, async (req, res) => {
+    try {
+      const cantidad = Number(req.body.cantidad);
+      if (!cantidad) return responder(req, res, { destino, error: 'Indica la cantidad que entró.' });
+
+      const { rowCount } = await pool.query(
+        'UPDATE productos SET existencias = existencias + $1, actualizado_en = now() WHERE id = $2 AND almacen_id = $3',
+        [cantidad, req.params.id, almacenDe(req)]
+      );
+      if (rowCount === 0) return responder(req, res, { destino, error: 'Producto no encontrado.' });
+
+      await pool.query(
+        `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, nota, registrado_por)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, cantidad > 0 ? 'entrada' : 'ajuste', cantidad, req.body.nota || null, req.session.usuario.id]
+      );
+
+      const producto = await leerProducto(req.params.id);
+      responder(req, res, {
+        destino,
+        ok: 'Inventario actualizado.',
+        json: {
+          producto,
+          mensaje: `${producto.nombre}: ahora hay ${producto.existencias} ${producto.unidad}.`,
+        },
+      });
+    } catch (err) {
+      fallo(req, res, err);
+    }
+  });
+
+  // «Quitar» NO borra el producto: lo desactiva. Así las facturas viejas conservan su
+  // descripción, su cantidad y su total, y el producto se puede devolver cuando vuelva.
+  router.post(`${prefijo}/:id/eliminar`, pasos, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        'UPDATE productos SET activo = false, actualizado_en = now() WHERE id = $1 AND almacen_id = $2 RETURNING id, nombre',
+        [req.params.id, almacenDe(req)]
+      );
+      if (rows.length === 0) return responder(req, res, { destino, error: 'Producto no encontrado.' });
+
+      responder(req, res, {
+        destino,
+        ok: 'Producto quitado.',
+        json: {
+          producto: await leerProducto(rows[0].id),
+          mensaje: `«${rows[0].nombre}» quitado de ${lugar}. Sus ventas anteriores no se tocan.`,
+        },
+      });
+    } catch (err) {
+      fallo(req, res, err);
+    }
+  });
+
+  router.post(`${prefijo}/:id/activar`, pasos, async (req, res) => {
+    try {
+      const { rows } = await pool.query(
+        'UPDATE productos SET activo = true, actualizado_en = now() WHERE id = $1 AND almacen_id = $2 RETURNING id, nombre',
+        [req.params.id, almacenDe(req)]
+      );
+      if (rows.length === 0) return responder(req, res, { destino, error: 'Producto no encontrado.' });
+
+      responder(req, res, {
+        destino,
+        ok: 'Producto devuelto.',
+        json: { producto: await leerProducto(rows[0].id), mensaje: `«${rows[0].nombre}» vuelve a ${lugar}.` },
+      });
+    } catch (err) {
+      fallo(req, res, err);
+    }
+  });
 }
 
 // ============================ FACTURAR ============================
@@ -636,71 +841,22 @@ router.post('/documentos/:id/anular', async (req, res) => {
 
 router.get('/productos', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
-  const [almacen, productos] = await Promise.all([
-    cargarAlmacen(almacenId),
-    pool.query('SELECT * FROM productos WHERE almacen_id = $1 ORDER BY activo DESC, nombre', [almacenId]),
-  ]);
+  const [almacen, productos] = await Promise.all([cargarAlmacen(almacenId), catalogoDe(almacenId)]);
   res.render('almacen/productos', {
     almacen,
-    productos: productos.rows,
+    productos,
     activo: 'productos',
     mensaje: req.query.ok || null,
     error: req.query.error || null,
   });
 });
 
-router.post('/productos', async (req, res) => {
-  const almacenId = req.session.usuario.almacenId;
-  const { nombre, unidad, precio_venta, existencias, controla_stock } = req.body;
-  if (!nombre || !nombre.trim()) {
-    return res.redirect('/almacen/productos?error=' + encodeURIComponent('El producto necesita un nombre.'));
-  }
-  // Ojo: el personal del almacén NO define el precio de costo; eso lo hacen admin/jefa.
-  await pool.query(
-    `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, existencias, controla_stock)
-     VALUES ($1,$2,$3,$4,$5,$6)
-     ON CONFLICT (almacen_id, nombre) DO UPDATE
-       SET unidad = EXCLUDED.unidad, precio_venta = EXCLUDED.precio_venta,
-           controla_stock = EXCLUDED.controla_stock, activo = true, actualizado_en = now()`,
-    [
-      almacenId,
-      nombre.trim(),
-      (unidad || 'unidad').trim(),
-      Number(precio_venta) || 0,
-      Number(existencias) || 0,
-      controla_stock !== undefined,
-    ]
-  );
-  res.redirect('/almacen/productos?ok=' + encodeURIComponent('Producto guardado.'));
-});
-
-router.post('/productos/:id/entrada', async (req, res) => {
-  const almacenId = req.session.usuario.almacenId;
-  const cantidad = Number(req.body.cantidad);
-  if (!cantidad) {
-    return res.redirect('/almacen/productos?error=' + encodeURIComponent('Indica la cantidad que entró.'));
-  }
-  const { rowCount } = await pool.query(
-    'UPDATE productos SET existencias = existencias + $1 WHERE id = $2 AND almacen_id = $3',
-    [cantidad, req.params.id, almacenId]
-  );
-  if (rowCount > 0) {
-    await pool.query(
-      `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, nota, registrado_por)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [req.params.id, cantidad > 0 ? 'entrada' : 'ajuste', cantidad, req.body.nota || null, req.session.usuario.id]
-    );
-  }
-  res.redirect('/almacen/productos?ok=' + encodeURIComponent('Inventario actualizado.'));
-});
-
-router.post('/productos/:id/eliminar', async (req, res) => {
-  const almacenId = req.session.usuario.almacenId;
-  await pool.query('UPDATE productos SET activo = false WHERE id = $1 AND almacen_id = $2', [
-    req.params.id,
-    almacenId,
-  ]);
-  res.redirect('/almacen/productos?ok=' + encodeURIComponent('Producto desactivado.'));
+montarCatalogo({
+  prefijo: '/productos',
+  destino: '/almacen/productos',
+  lugar: 'el catálogo',
+  conPrecio: true,
+  almacenDe: (req) => req.session.usuario.almacenId,
 });
 
 // ============================ CAJA DEL DÍA ============================
@@ -962,62 +1118,24 @@ async function conBodega(req, res, next) {
 }
 
 router.get('/bodega', conBodega, async (req, res) => {
-  const productos = await pool.query(
-    'SELECT * FROM productos WHERE almacen_id = $1 ORDER BY activo DESC, nombre',
-    [req.bodega.id]
-  );
   res.render('almacen/bodega', {
     almacen: await cargarAlmacen(req.session.usuario.almacenId),
     bodega: req.bodega,
-    productos: productos.rows,
+    productos: await catalogoDe(req.bodega.id),
     activo: 'bodega',
     mensaje: req.query.ok || null,
     error: req.query.error || null,
   });
 });
 
-router.post('/bodega/productos', conBodega, async (req, res) => {
-  const { nombre, unidad, existencias, controla_stock } = req.body;
-  if (!nombre || !nombre.trim()) {
-    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('El producto necesita un nombre.'));
-  }
-  // Igual que en el almacén: el precio de costo lo maneja la administración.
-  await pool.query(
-    `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, existencias, controla_stock)
-     VALUES ($1,$2,$3,0,$4,$5)
-     ON CONFLICT (almacen_id, nombre) DO UPDATE
-       SET unidad = EXCLUDED.unidad, controla_stock = EXCLUDED.controla_stock,
-           activo = true, actualizado_en = now()`,
-    [req.bodega.id, nombre.trim(), (unidad || 'unidad').trim(), Number(existencias) || 0, controla_stock !== undefined]
-  );
-  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Producto guardado en la bodega.'));
-});
-
-router.post('/bodega/productos/:id/entrada', conBodega, async (req, res) => {
-  const cantidad = Number(req.body.cantidad);
-  if (!cantidad) {
-    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('Indica la cantidad que entró.'));
-  }
-  const { rowCount } = await pool.query(
-    'UPDATE productos SET existencias = existencias + $1 WHERE id = $2 AND almacen_id = $3',
-    [cantidad, req.params.id, req.bodega.id]
-  );
-  if (rowCount > 0) {
-    await pool.query(
-      `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, nota, registrado_por)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [req.params.id, cantidad > 0 ? 'entrada' : 'ajuste', cantidad, req.body.nota || null, req.session.usuario.id]
-    );
-  }
-  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Inventario de la bodega actualizado.'));
-});
-
-router.post('/bodega/productos/:id/eliminar', conBodega, async (req, res) => {
-  await pool.query('UPDATE productos SET activo = false WHERE id = $1 AND almacen_id = $2', [
-    req.params.id,
-    req.bodega.id,
-  ]);
-  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Producto desactivado.'));
+// La bodega usa el mismo catálogo que el almacén, pero sin precio de venta: no vende.
+montarCatalogo({
+  prefijo: '/bodega/productos',
+  destino: '/almacen/bodega',
+  lugar: 'la bodega',
+  conPrecio: false,
+  almacenDe: (req) => req.bodega.id,
+  previos: [conBodega],
 });
 
 router.get('/bodega/excel', conBodega, async (req, res) => {
