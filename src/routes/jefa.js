@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const pool = require('../db/pool');
 const { hoyISO } = require('../lib/fecha');
-const { plantillaExcel, inventarioExcel } = require('../lib/importar');
+const { plantillaExcel, inventarioExcel, valorizacionExcel } = require('../lib/importar');
 const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
 const { detectarInvertidos, repararInvertidos, repararCostos } = require('../lib/reparar');
 const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = require('../lib/traslados');
@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
   const fecha = req.query.fecha || hoyISO();
 
   const [almacenes, ventas, gastos, unidades] = await Promise.all([
-    pool.query(SQL_ALMACENES.replace('ORDER BY', 'WHERE a.activo = true ORDER BY')),
+    pool.query(SQL_ALMACENES.replace('ORDER BY', 'WHERE a.activo = true AND a.es_bodega = false ORDER BY')),
     pool.query(
       `SELECT almacen_id, COALESCE(SUM(total),0) AS venta, COALESCE(SUM(costo_total),0) AS costo,
               COALESCE(SUM(margen),0) AS margen, COUNT(*) AS facturas
@@ -122,7 +122,8 @@ router.get('/reporte', async (req, res) => {
     pool.query('SELECT * FROM regiones WHERE activo = true ORDER BY nombre'),
   ]);
 
-  let filtrados = almacenes.rows;
+  // Las bodegas no venden, así que no entran en el reporte de ventas.
+  let filtrados = almacenes.rows.filter((a) => !a.es_bodega);
   if (almacenFiltro !== 'todos') filtrados = filtrados.filter((a) => String(a.id) === String(almacenFiltro));
   else if (regionFiltro !== 'todas') filtrados = filtrados.filter((a) => String(a.region_id) === String(regionFiltro));
   const ids = filtrados.map((a) => a.id);
@@ -185,7 +186,7 @@ router.get('/reporte', async (req, res) => {
 
   res.render('jefa/reporte', {
     mes,
-    almacenes: almacenes.rows,
+    almacenes: almacenes.rows.filter((a) => !a.es_bodega),
     regiones: regiones.rows,
     almacenFiltro,
     regionFiltro,
@@ -243,7 +244,7 @@ router.get('/gastos', async (req, res) => {
 
   res.render('jefa/gastos', {
     mes,
-    almacenes: almacenes.rows,
+    almacenes: almacenes.rows.filter((a) => !a.es_bodega),
     regiones: regiones.rows,
     almacenFiltro,
     regionFiltro,
@@ -491,6 +492,113 @@ router.get('/traslados/imprimir/:id', async (req, res) => {
   });
 });
 
+// ======================= CUÁNTO VALE LA BODEGA =======================
+// La mercancía guardada es plata quieta. Aquí se ve a precio de costo y con el porcentaje
+// que se le quiera cargar encima (editable por bodega). Solo admin/jefa: es información de
+// costos, que el personal no ve nunca.
+
+const SQL_BODEGAS = `SELECT b.*, a.nombre AS almacen_nombre
+  FROM almacenes b LEFT JOIN almacenes a ON a.id = b.bodega_de
+  WHERE b.es_bodega = true AND b.activo = true ORDER BY b.nombre`;
+
+async function valorizarBodega(bodegaId, porcentaje) {
+  const { rows } = await pool.query(
+    `SELECT nombre, unidad, existencias, precio_costo,
+            (existencias * precio_costo) AS valor_costo
+     FROM productos
+     WHERE almacen_id = $1 AND activo = true AND existencias <> 0
+     ORDER BY (existencias * precio_costo) DESC, nombre`,
+    [bodegaId]
+  );
+
+  const factor = 1 + (Number(porcentaje) || 0) / 100;
+  const lineas = rows.map((p) => {
+    const valorCosto = Number(p.valor_costo);
+    return {
+      ...p,
+      existencias: Number(p.existencias),
+      precio_costo: Number(p.precio_costo),
+      valor_costo: valorCosto,
+      valor_con_margen: valorCosto * factor,
+    };
+  });
+
+  const costo = lineas.reduce((a, l) => a + l.valor_costo, 0);
+  const { rows: sinCosto } = await pool.query(
+    'SELECT COUNT(*)::int AS n FROM productos WHERE almacen_id = $1 AND activo = true AND existencias <> 0 AND precio_costo = 0',
+    [bodegaId]
+  );
+
+  return {
+    lineas,
+    sinCosto: sinCosto[0].n,
+    totales: {
+      productos: lineas.length,
+      unidades: lineas.reduce((a, l) => a + l.existencias, 0),
+      costo,
+      margen: costo * factor - costo,
+      conMargen: costo * factor,
+    },
+  };
+}
+
+router.get('/bodegas', async (req, res) => {
+  const bodegas = await pool.query(SQL_BODEGAS);
+  if (bodegas.rows.length === 0) {
+    return res.render('jefa/bodegas', {
+      bodegas: [],
+      bodega: null,
+      valor: null,
+      activo: 'bodegas',
+      mensaje: req.query.ok || null,
+    });
+  }
+
+  const elegida =
+    bodegas.rows.find((b) => String(b.id) === String(req.query.bodega)) || bodegas.rows[0];
+  const porcentaje =
+    req.query.porcentaje !== undefined && req.query.porcentaje !== ''
+      ? Number(req.query.porcentaje)
+      : Number(elegida.margen_valoracion);
+
+  res.render('jefa/bodegas', {
+    bodegas: bodegas.rows,
+    bodega: elegida,
+    porcentaje,
+    valor: await valorizarBodega(elegida.id, porcentaje),
+    activo: 'bodegas',
+    mensaje: req.query.ok || null,
+  });
+});
+
+// Guardar el porcentaje con el que se valora esa bodega de aquí en adelante.
+router.post('/bodegas/:id/porcentaje', soloAdmin, async (req, res) => {
+  const porcentaje = Math.max(0, Math.min(500, Number(req.body.porcentaje) || 0));
+  await pool.query('UPDATE almacenes SET margen_valoracion = $1 WHERE id = $2 AND es_bodega = true', [
+    porcentaje,
+    req.params.id,
+  ]);
+  res.redirect(
+    `/jefa/bodegas?bodega=${req.params.id}&ok=` + encodeURIComponent(`Valorización guardada en ${porcentaje}%.`)
+  );
+});
+
+router.get('/bodegas/:id/excel', async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1 AND es_bodega = true', [req.params.id]);
+  if (rows.length === 0) return res.redirect('/jefa/bodegas');
+
+  const porcentaje =
+    req.query.porcentaje !== undefined && req.query.porcentaje !== ''
+      ? Number(req.query.porcentaje)
+      : Number(rows[0].margen_valoracion);
+  const valor = await valorizarBodega(rows[0].id, porcentaje);
+
+  const archivo = `valor_${rows[0].nombre.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+  res.send(valorizacionExcel(valor, { nombre: rows[0].nombre, porcentaje }));
+});
+
 // ======================= IMPORTAR INVENTARIO DESDE EXCEL =======================
 
 router.get('/importar', async (req, res) => {
@@ -652,23 +760,31 @@ router.post('/admin/regiones/:id/eliminar', soloAdmin, async (req, res) => {
 });
 
 router.post('/admin/almacenes', soloAdmin, async (req, res) => {
-  const { nombre, region_id, papel } = req.body;
+  const { nombre, region_id, papel, bodega_de } = req.body;
   if (!nombre || !nombre.trim()) return res.redirect('/jefa/admin');
+
+  // Una bodega no vende: se crea enlazada al almacén que la maneja.
+  const esBodega = Boolean(bodega_de);
   await pool.query(
-    `INSERT INTO almacenes (nombre, region_id, papel, encabezado) VALUES ($1,$2,$3,$1)
-     ON CONFLICT (nombre) DO UPDATE SET region_id = EXCLUDED.region_id, papel = EXCLUDED.papel`,
-    [nombre.trim(), region_id || null, papelValido(papel)]
+    `INSERT INTO almacenes (nombre, region_id, papel, encabezado, es_bodega, bodega_de)
+     VALUES ($1,$2,$3,$1,$4,$5)
+     ON CONFLICT (nombre) DO UPDATE SET region_id = EXCLUDED.region_id, papel = EXCLUDED.papel,
+       es_bodega = EXCLUDED.es_bodega, bodega_de = EXCLUDED.bodega_de`,
+    [nombre.trim(), region_id || null, papelValido(papel), esBodega, esBodega ? Number(bodega_de) : null]
   );
-  res.redirect('/jefa/admin?ok=' + encodeURIComponent('Almacén guardado.'));
+  res.redirect(
+    '/jefa/admin?ok=' +
+      encodeURIComponent(esBodega ? 'Bodega creada y enlazada. Su almacén ya la ve en su pestaña «Bodega».' : 'Almacén guardado.')
+  );
 });
 
 router.post('/admin/almacenes/:id/actualizar', soloAdmin, async (req, res) => {
-  const { region_id, papel } = req.body;
-  await pool.query('UPDATE almacenes SET region_id = $1, papel = $2 WHERE id = $3', [
-    region_id || null,
-    papelValido(papel),
-    req.params.id,
-  ]);
+  const { region_id, papel, bodega_de } = req.body;
+  const esBodega = Boolean(bodega_de) && String(bodega_de) !== String(req.params.id);
+  await pool.query(
+    'UPDATE almacenes SET region_id = $1, papel = $2, es_bodega = $3, bodega_de = $4 WHERE id = $5',
+    [region_id || null, papelValido(papel), esBodega, esBodega ? Number(bodega_de) : null, req.params.id]
+  );
   res.redirect('/jefa/admin?ok=' + encodeURIComponent('Almacén actualizado.'));
 });
 

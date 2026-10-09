@@ -22,6 +22,16 @@ const router = express.Router();
 // El archivo de Excel se lee en memoria y se descarta; nunca se guarda en el servidor.
 const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+// Si esta caja tiene bodega enlazada, la barra de arriba muestra su pestaña.
+router.use(async (req, res, next) => {
+  try {
+    res.locals.bodega = req.session.usuario.almacenId ? await bodegaDe(req.session.usuario.almacenId) : null;
+  } catch (err) {
+    res.locals.bodega = null;
+  }
+  next();
+});
+
 async function cargarAlmacen(almacenId) {
   const { rows } = await pool.query('SELECT * FROM almacenes WHERE id = $1', [almacenId]);
   return rows[0];
@@ -927,6 +937,205 @@ router.post('/productos/importar/aplicar', async (req, res) => {
   }
 });
 
+// ============================ BODEGA ============================
+// Una bodega es un almacén que NO vende: solo guarda mercancía y la despacha a los demás.
+// La maneja el almacén al que está enlazada (`bodega_de`), así que su gente entra desde
+// su propia sesión, sin un usuario aparte. El costo y el valor de la mercancía NO se ven
+// aquí: eso lo ve la administración en su panel, como con todo lo demás.
+
+async function bodegaDe(almacenId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM almacenes WHERE bodega_de = $1 AND es_bodega = true AND activo = true ORDER BY id LIMIT 1',
+    [almacenId]
+  );
+  return rows[0] || null;
+}
+
+// Todas las rutas de /bodega necesitan lo mismo: que exista y que sea la de esta caja.
+async function conBodega(req, res, next) {
+  const bodega = await bodegaDe(req.session.usuario.almacenId);
+  if (!bodega) {
+    return res.redirect('/almacen?error=' + encodeURIComponent('Este almacén no tiene bodega enlazada.'));
+  }
+  req.bodega = bodega;
+  next();
+}
+
+router.get('/bodega', conBodega, async (req, res) => {
+  const productos = await pool.query(
+    'SELECT * FROM productos WHERE almacen_id = $1 ORDER BY activo DESC, nombre',
+    [req.bodega.id]
+  );
+  res.render('almacen/bodega', {
+    almacen: await cargarAlmacen(req.session.usuario.almacenId),
+    bodega: req.bodega,
+    productos: productos.rows,
+    activo: 'bodega',
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/bodega/productos', conBodega, async (req, res) => {
+  const { nombre, unidad, existencias, controla_stock } = req.body;
+  if (!nombre || !nombre.trim()) {
+    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('El producto necesita un nombre.'));
+  }
+  // Igual que en el almacén: el precio de costo lo maneja la administración.
+  await pool.query(
+    `INSERT INTO productos (almacen_id, nombre, unidad, precio_venta, existencias, controla_stock)
+     VALUES ($1,$2,$3,0,$4,$5)
+     ON CONFLICT (almacen_id, nombre) DO UPDATE
+       SET unidad = EXCLUDED.unidad, controla_stock = EXCLUDED.controla_stock,
+           activo = true, actualizado_en = now()`,
+    [req.bodega.id, nombre.trim(), (unidad || 'unidad').trim(), Number(existencias) || 0, controla_stock !== undefined]
+  );
+  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Producto guardado en la bodega.'));
+});
+
+router.post('/bodega/productos/:id/entrada', conBodega, async (req, res) => {
+  const cantidad = Number(req.body.cantidad);
+  if (!cantidad) {
+    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('Indica la cantidad que entró.'));
+  }
+  const { rowCount } = await pool.query(
+    'UPDATE productos SET existencias = existencias + $1 WHERE id = $2 AND almacen_id = $3',
+    [cantidad, req.params.id, req.bodega.id]
+  );
+  if (rowCount > 0) {
+    await pool.query(
+      `INSERT INTO movimientos_inventario (producto_id, tipo, cantidad, nota, registrado_por)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [req.params.id, cantidad > 0 ? 'entrada' : 'ajuste', cantidad, req.body.nota || null, req.session.usuario.id]
+    );
+  }
+  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Inventario de la bodega actualizado.'));
+});
+
+router.post('/bodega/productos/:id/eliminar', conBodega, async (req, res) => {
+  await pool.query('UPDATE productos SET activo = false WHERE id = $1 AND almacen_id = $2', [
+    req.params.id,
+    req.bodega.id,
+  ]);
+  res.redirect('/almacen/bodega?ok=' + encodeURIComponent('Producto desactivado.'));
+});
+
+router.get('/bodega/excel', conBodega, async (req, res) => {
+  const productos = await pool.query(
+    `SELECT nombre, unidad, precio_venta, existencias, controla_stock
+     FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+    [req.bodega.id]
+  );
+  const archivo = `inventario_${req.bodega.nombre.replace(/[^a-zA-Z0-9]+/g, '_').toLowerCase()}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${archivo}"`);
+  res.send(inventarioExcel(productos.rows, { conCosto: false }));
+});
+
+router.post('/bodega/importar', conBodega, subida.single('archivo'), async (req, res) => {
+  if (!req.file) return res.redirect('/almacen/bodega?error=' + encodeURIComponent('Elige el archivo de Excel.'));
+
+  let revision;
+  try {
+    revision = await revisarInventario(pool, req.bodega.id, req.file.buffer);
+  } catch (err) {
+    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('No pude leer el archivo.'));
+  }
+  if (revision.filas.length === 0) {
+    return res.redirect(
+      '/almacen/bodega?error=' + encodeURIComponent(revision.errores[0] || 'El archivo no tiene productos.')
+    );
+  }
+
+  res.render('almacen/importar', {
+    almacen: req.bodega,
+    destino: 'bodega',
+    previo: {
+      ...revision,
+      modoExistencias: req.body.modo_existencias === 'sumar' ? 'sumar' : 'reemplazar',
+      nombreArchivo: req.file.originalname,
+      filasFormulario: filasParaFormulario(revision.filas, false),
+    },
+    activo: 'bodega',
+  });
+});
+
+router.post('/bodega/importar/aplicar', conBodega, async (req, res) => {
+  let filas;
+  try {
+    filas = JSON.parse(req.body.filas || '[]');
+  } catch (err) {
+    return res.redirect('/almacen/bodega?error=' + encodeURIComponent('Se perdió la vista previa.'));
+  }
+  try {
+    const { creados, actualizados } = await aplicarInventario(pool, {
+      almacenId: req.bodega.id,
+      filas,
+      modo: req.body.modo_existencias,
+      conCosto: false,
+    });
+    res.redirect(
+      '/almacen/bodega?ok=' + encodeURIComponent(`Listo: ${creados} nuevo(s) y ${actualizados} actualizado(s).`)
+    );
+  } catch (err) {
+    res.redirect('/almacen/bodega?error=' + encodeURIComponent('No se pudo guardar: ' + err.message));
+  }
+});
+
+// Despachar desde la bodega: la misma hoja de traslado, pero el origen es la bodega.
+router.get('/bodega/traslados', conBodega, async (req, res) => {
+  const [almacen, destinos, productos, historial] = await Promise.all([
+    cargarAlmacen(req.session.usuario.almacenId),
+    pool.query('SELECT id, nombre FROM almacenes WHERE activo = true AND id <> $1 ORDER BY nombre', [req.bodega.id]),
+    pool.query(
+      `SELECT id, nombre, unidad, existencias, controla_stock
+       FROM productos WHERE almacen_id = $1 AND activo = true ORDER BY nombre`,
+      [req.bodega.id]
+    ),
+    listarTraslados(pool, { almacenId: req.bodega.id, limite: 60 }),
+  ]);
+
+  res.render('almacen/bodega_traslados', {
+    almacen,
+    bodega: req.bodega,
+    destinos: destinos.rows,
+    productos: productos.rows,
+    historial,
+    hoy: hoyISO(),
+    activo: 'bodega',
+    mensaje: req.query.ok || null,
+    error: req.query.error || null,
+  });
+});
+
+router.post('/bodega/traslados', conBodega, express.json({ limit: '256kb' }), async (req, res) => {
+  try {
+    const t = await crearTraslado(pool, {
+      origenId: req.bodega.id,
+      destinoId: req.body.destino_id,
+      usuarioId: req.session.usuario.id,
+      cuerpo: req.body,
+    });
+    res.json({ ok: true, id: t.id, numero: t.numero, imprimir: `/almacen/traslados/imprimir/${t.id}` });
+  } catch (err) {
+    console.error('Error al despachar de la bodega:', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+router.post('/bodega/traslados/:id/anular', conBodega, async (req, res) => {
+  try {
+    await anularTraslado(pool, {
+      trasladoId: req.params.id,
+      almacenId: req.bodega.id,
+      usuarioId: req.session.usuario.id,
+    });
+    res.redirect('/almacen/bodega/traslados?ok=' + encodeURIComponent('Traslado anulado; la mercancía volvió a la bodega.'));
+  } catch (err) {
+    res.redirect('/almacen/bodega/traslados?error=' + encodeURIComponent(err.message));
+  }
+});
+
 // ============================ MOVIMIENTO DEL DÍA ============================
 // Qué material salió hoy: vendido, trasladado a otro almacén y lo que entró.
 
@@ -1037,7 +1246,8 @@ router.post('/traslados/:id/anular', async (req, res) => {
 
 router.get('/traslados/imprimir/:id', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
-  const datos = await cargarTraslado(pool, req.params.id, almacenId);
+  const bodega = await bodegaDe(almacenId);
+  const datos = await cargarTraslado(pool, req.params.id, bodega ? [almacenId, bodega.id] : almacenId);
   if (!datos) return res.status(404).render('404');
 
   const almacen = await cargarAlmacen(almacenId);

@@ -1,0 +1,118 @@
+<%- include('../partials/head', { titulo: 'Cuánto vale la bodega' }) %>
+<%- include('../partials/barra', { usuario, activo: 'bodegas' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+
+  <% if (!bodega) { %>
+    <div class="panel">
+      <h2>Bodegas</h2>
+      <p class="ayuda">
+        Todavía no hay ninguna bodega. Se crea en «Almacenes y usuarios»: le pones nombre y eliges
+        de qué almacén es. Ese almacén la verá en su pestaña «Bodega» para despachar mercancía, y
+        aquí verás cuánto vale lo que tiene guardado.
+      </p>
+    </div>
+  <% } else { %>
+
+    <div class="panel">
+      <div class="fila-filtro">
+        <div>
+          <h2 style="margin-bottom:2px">Cuánto vale la bodega</h2>
+          <p class="ayuda" style="margin:0">
+            <b><%= bodega.nombre %></b><%= bodega.almacen_nombre ? ' — bodega de ' + bodega.almacen_nombre : '' %>.
+            Es la mercancía guardada, valorada al precio de costo y con el porcentaje que le cargues encima.
+          </p>
+        </div>
+        <form method="get" action="/jefa/bodegas" style="margin-left:auto;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <% if (bodegas.length > 1) { %>
+            <label class="campo">Bodega
+              <select name="bodega" onchange="this.form.submit()">
+                <% bodegas.forEach(b => { %>
+                  <option value="<%= b.id %>" <%= b.id === bodega.id ? 'selected' : '' %>><%= b.nombre %></option>
+                <% }) %>
+              </select>
+            </label>
+          <% } else { %>
+            <input type="hidden" name="bodega" value="<%= bodega.id %>">
+          <% } %>
+          <label class="campo">Ver con este %
+            <input class="in n" type="number" name="porcentaje" value="<%= porcentaje %>" min="0" max="500" step="0.5" style="width:110px">
+          </label>
+          <button class="btn linea" type="submit">Calcular</button>
+        </form>
+      </div>
+
+      <div class="tarjetas">
+        <div class="tarjeta"><span>Productos</span><strong><%= valor.totales.productos %></strong></div>
+        <div class="tarjeta"><span>Unidades guardadas</span><strong><%= fmtCant(valor.totales.unidades) %></strong></div>
+        <div class="tarjeta venta"><span>Valor a costo</span><strong><%= fmt(valor.totales.costo) %></strong></div>
+        <div class="tarjeta margen"><span>Con el <%= porcentaje %>%</span><strong><%= fmt(valor.totales.conMargen) %></strong></div>
+      </div>
+
+      <p class="ayuda" style="margin:0">
+        El <%= porcentaje %>% encima del costo son <b><%= fmt(valor.totales.margen) %></b>.
+        Este porcentaje es solo para valorar: la mercancía sigue saliendo hacia los almacenes a su
+        costo real, para que la ganancia de cada almacén no se vea afectada.
+      </p>
+
+      <form method="post" action="/jefa/bodegas/<%= bodega.id %>/porcentaje" style="margin-top:14px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <label class="campo">Dejar fijo este porcentaje para <%= bodega.nombre %>
+          <input class="in n" type="number" name="porcentaje" value="<%= porcentaje %>" min="0" max="500" step="0.5" style="width:110px">
+        </label>
+        <button class="btn prim" type="submit">Guardar porcentaje</button>
+        <a class="btn linea" href="/jefa/bodegas/<%= bodega.id %>/excel?porcentaje=<%= porcentaje %>">Descargar en Excel</a>
+      </form>
+    </div>
+
+    <% if (valor.sinCosto > 0) { %>
+      <div class="aviso-caja">
+        <b><%= valor.sinCosto %></b> producto(s) con existencias no tienen precio de costo, así que
+        entran en este cálculo como si valieran cero y el total queda por debajo de lo real.
+        Ponles el costo en <a href="/jefa/costos?almacen=<%= bodega.id %>">Costos</a>.
+      </div>
+    <% } %>
+
+    <div class="panel">
+      <h3>Qué hay guardado</h3>
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Producto</th><th>Unidad</th>
+            <th class="n">Existencias</th>
+            <th class="n">Costo unitario</th>
+            <th class="n">Valor a costo</th>
+            <th class="n">Con el <%= porcentaje %>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% valor.lineas.forEach(l => { %>
+            <tr<%= l.precio_costo === 0 ? ' class="sin-stock"' : '' %>>
+              <td><%= l.nombre %></td>
+              <td><%= l.unidad %></td>
+              <td class="n"><%= fmtCant(l.existencias) %></td>
+              <td class="n"><%= fmt(l.precio_costo) %></td>
+              <td class="n"><%= fmt(l.valor_costo) %></td>
+              <td class="n"><%= fmt(l.valor_con_margen) %></td>
+            </tr>
+          <% }) %>
+          <% if (valor.lineas.length === 0) { %>
+            <tr><td colspan="6" class="vacio">La bodega está vacía.</td></tr>
+          <% } %>
+        </tbody>
+        <% if (valor.lineas.length > 0) { %>
+          <tfoot>
+            <tr>
+              <td>Total</td><td></td>
+              <td class="n"><%= fmtCant(valor.totales.unidades) %></td>
+              <td></td>
+              <td class="n"><%= fmt(valor.totales.costo) %></td>
+              <td class="n"><%= fmt(valor.totales.conMargen) %></td>
+            </tr>
+          </tfoot>
+        <% } %>
+      </table>
+    </div>
+  <% } %>
+</main>
+</body>
+</html>

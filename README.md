@@ -12,6 +12,8 @@ Sistema web para varios almacenes. Cada almacén tiene su propio sitio de factur
 | **Precio de costo y ganancia** | **No lo ve nunca** | Sí | Sí |
 | Reportes de todos los almacenes | No | Sí | Sí |
 | Trasladar mercancía a otro almacén | Sí (desde el suyo) | Sí (desde cualquiera) | Sí (desde cualquiera) |
+| Manejar la bodega enlazada a su almacén | Sí (entradas y despachos) | Sí | Sí |
+| **Cuánto vale la mercancía de la bodega** | **No lo ve** | Sí | Sí |
 | Crear/borrar almacenes, sedes y usuarios | No | Sí | Sí |
 
 La idea de fondo: **el vendedor factura al precio que quiera**; el costo lo pone la
@@ -82,6 +84,33 @@ aparecen los errores, y las de días anteriores quedan congeladas para que un re
 cambie por detrás. Las cotizaciones se pueden corregir siempre, porque no mueven inventario ni caja.
 Cada corrección queda registrada con el usuario y la hora, y la lista muestra cuántas veces se editó
 cada documento.
+
+## Bodega
+
+Una **bodega** es un almacén que **nunca vende**: solo guarda mercancía y la despacha. Se crea en
+«Almacenes y usuarios» eligiendo de qué almacén es —por ejemplo, bodega de PVElectricos—, y a partir
+de ahí el usuario de ese almacén ve una pestaña **«Bodega»** en su propia sesión, sin usuario ni
+clave aparte. Desde ahí registra lo que entra (a mano o con el Excel de siempre) y despacha a
+cualquier almacén con la misma hoja de traslado, que es la que ya conoce: sin precios, con su
+consecutivo y sus firmas.
+
+La bodega no tiene Facturar, ni Cotizar, ni Caja, y tampoco aparece en el panel de ventas ni en el
+reporte mensual, porque no vende nada.
+
+### Cuánto vale la bodega
+
+En la pestaña **«Bodega»** del panel de administración (solo admin/jefa, porque son costos):
+producto por producto, las existencias, el precio de costo, el valor a costo —existencias × costo—
+y el mismo valor con un **porcentaje encima que tú defines**. Abajo, el total de la bodega en las
+dos cifras, y el botón para bajarlo en Excel.
+
+El porcentaje se cambia en el momento para mirar cuánto daría con otro número, y se puede dejar fijo
+por bodega. Es **solo para valorar**: la mercancía sigue saliendo hacia los almacenes a su costo
+real, para que la ganancia de cada almacén no se vea afectada por un sobrecosto interno.
+
+El valor se mueve solo: sube cuando entra mercancía y baja cuando se despacha. Si algún producto con
+existencias no tiene precio de costo, la pantalla avisa, porque ese entra al total como si valiera
+cero.
 
 ## Traslados entre almacenes
 

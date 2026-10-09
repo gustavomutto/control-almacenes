@@ -1,5 +1,7 @@
+<% const enBodega = typeof destino !== 'undefined' && destino === 'bodega'; %>
+<% const volver = enBodega ? '/almacen/bodega' : '/almacen/productos'; %>
 <%- include('../partials/head', { titulo: 'Subir inventario — ' + almacen.nombre }) %>
-<%- include('../partials/barra', { usuario, activo: 'productos' }) %>
+<%- include('../partials/barra', { usuario, activo: enBodega ? 'bodega' : 'productos' }) %>
 <main>
   <div class="panel">
     <h2>Revisa antes de guardar</h2>
@@ -45,11 +47,11 @@
       <p class="ayuda" style="margin-top:10px">Se muestran los primeros 200 de <%= previo.filas.length %>. Se guardarán todos.</p>
     <% } %>
 
-    <form method="post" action="/almacen/productos/importar/aplicar" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
+    <form method="post" action="<%= volver %>/importar/aplicar" style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap">
       <input type="hidden" name="modo_existencias" value="<%= previo.modoExistencias %>">
       <input type="hidden" name="filas" value="<%= JSON.stringify(previo.filasFormulario) %>">
       <button class="btn cobrar" type="submit">Guardar <%= previo.filas.length %> producto(s)</button>
-      <a class="btn linea" href="/almacen/productos">Cancelar</a>
+      <a class="btn linea" href="<%= volver %>">Cancelar</a>
     </form>
   </div>
 </main>

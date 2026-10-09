@@ -216,10 +216,12 @@ const SQL_TRASLADO = `
   LEFT JOIN usuarios u ON u.id = t.registrado_por`;
 
 // Un traslado lo puede ver (e imprimir) el almacén que envía y el que recibe.
+// `almacenId` puede ser un número o una lista (una caja y su bodega, por ejemplo).
 async function cargarTraslado(pool, id, almacenId) {
+  const ids = almacenId == null ? null : [].concat(almacenId).map(Number).filter(Boolean);
   const { rows } = await pool.query(
-    `${SQL_TRASLADO} WHERE t.id = $1 ${almacenId ? 'AND (t.origen_id = $2 OR t.destino_id = $2)' : ''}`,
-    almacenId ? [id, almacenId] : [id]
+    `${SQL_TRASLADO} WHERE t.id = $1 ${ids && ids.length ? 'AND (t.origen_id = ANY($2::int[]) OR t.destino_id = ANY($2::int[]))' : ''}`,
+    ids && ids.length ? [id, ids] : [id]
   );
   if (rows.length === 0) return null;
 
@@ -234,8 +236,8 @@ async function listarTraslados(pool, { almacenId, desde, hasta, limite = 100 }) 
   const cond = [];
   const params = [];
   if (almacenId) {
-    params.push(almacenId);
-    cond.push(`(t.origen_id = $${params.length} OR t.destino_id = $${params.length})`);
+    params.push([].concat(almacenId).map(Number).filter(Boolean));
+    cond.push(`(t.origen_id = ANY($${params.length}::int[]) OR t.destino_id = ANY($${params.length}::int[]))`);
   }
   if (desde) {
     params.push(desde);

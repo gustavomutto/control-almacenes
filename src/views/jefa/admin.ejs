@@ -47,6 +47,12 @@
                     <option value="<%= r.id %>" <%= a.region_id === r.id ? 'selected' : '' %>><%= r.nombre %></option>
                   <% }) %>
                 </select>
+                <select name="bodega_de" title="Bodega de qué almacén" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
+                  <option value="">Almacén que vende</option>
+                  <% almacenes.filter(o => !o.es_bodega && o.id !== a.id).forEach(o => { %>
+                    <option value="<%= o.id %>" <%= a.bodega_de === o.id ? 'selected' : '' %>>Bodega de <%= o.nombre %></option>
+                  <% }) %>
+                </select>
                 <select name="papel" style="padding:6px 8px;border:1px solid var(--line);border-radius:5px">
                   <option value="media" <%= a.papel === 'media' ? 'selected' : '' %>>Media carta (22 × 14 cm)</option>
                   <option value="carta" <%= a.papel === 'carta' ? 'selected' : '' %>>Hoja carta (se corta)</option>
@@ -78,6 +84,14 @@
           <select name="region_id">
             <option value="">Sin sede</option>
             <% regiones.forEach(r => { %><option value="<%= r.id %>"><%= r.nombre %></option><% }) %>
+          </select>
+        </label>
+        <label class="campo">¿Es una bodega?
+          <select name="bodega_de">
+            <option value="">No, es un almacén que vende</option>
+            <% almacenes.filter(a => !a.es_bodega).forEach(a => { %>
+              <option value="<%= a.id %>">Sí, bodega de <%= a.nombre %></option>
+            <% }) %>
           </select>
         </label>
         <label class="campo">Impresión

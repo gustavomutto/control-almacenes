@@ -183,4 +183,32 @@ function inventarioExcel(productos, { conCosto = false } = {}) {
   return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
 }
 
-module.exports = { leerInventario, plantillaExcel, inventarioExcel, aNumero, aBooleano };
+// Cuánto vale la mercancía de una bodega, para guardarlo o mandarlo por correo.
+function valorizacionExcel(valor, { nombre, porcentaje }) {
+  const datos = valor.lineas.map((l) => ({
+    producto: l.nombre,
+    unidad: l.unidad,
+    existencias: l.existencias,
+    precio_costo: l.precio_costo,
+    valor_a_costo: Math.round(l.valor_costo),
+    [`valor_mas_${porcentaje}`]: Math.round(l.valor_con_margen),
+  }));
+
+  datos.push({});
+  datos.push({
+    producto: `TOTAL ${nombre}`,
+    unidad: '',
+    existencias: valor.totales.unidades,
+    precio_costo: '',
+    valor_a_costo: Math.round(valor.totales.costo),
+    [`valor_mas_${porcentaje}`]: Math.round(valor.totales.conMargen),
+  });
+
+  const hoja = XLSX.utils.json_to_sheet(datos);
+  hoja['!cols'] = [{ wch: 36 }, { wch: 10 }, { wch: 13 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Valorización');
+  return XLSX.write(libro, { type: 'buffer', bookType: 'xlsx' });
+}
+
+module.exports = { leerInventario, plantillaExcel, inventarioExcel, valorizacionExcel, aNumero, aBooleano };

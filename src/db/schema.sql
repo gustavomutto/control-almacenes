@@ -29,6 +29,15 @@ ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS papel TEXT NOT NULL DEFAULT 'cart
 ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS metodos_pago TEXT NOT NULL DEFAULT 'Efectivo,Transferencia';
 ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS iva_por_defecto BOOLEAN NOT NULL DEFAULT false;
 
+-- Una bodega es un almacén que NO vende: solo guarda mercancía y la despacha a los demás.
+-- `bodega_de` la enlaza con el almacén que la maneja (PVElectricos, por ejemplo): el usuario
+-- de ese almacén entra a su bodega desde su propia sesión.
+-- `margen_valoracion` es el porcentaje con el que se valora la mercancía además del costo.
+ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS es_bodega BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS bodega_de INTEGER REFERENCES almacenes(id) ON DELETE SET NULL;
+ALTER TABLE almacenes ADD COLUMN IF NOT EXISTS margen_valoracion NUMERIC(6,2) NOT NULL DEFAULT 10;
+CREATE INDEX IF NOT EXISTS idx_almacenes_bodega_de ON almacenes (bodega_de);
+
 -- rol: 'almacen' (personal de un almacén, solo ve/edita el suyo)
 --      'jefa'    (ve el consolidado de todos los almacenes, solo lectura)
 --      'admin'   (como jefa, y además puede crear almacenes/usuarios)

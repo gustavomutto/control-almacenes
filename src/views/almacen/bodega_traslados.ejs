@@ -1,0 +1,65 @@
+<%- include('../partials/head', { titulo: 'Despachar desde ' + bodega.nombre }) %>
+<%- include('../partials/barra', { usuario, activo: 'bodega' }) %>
+<main>
+  <% if (mensaje) { %><div class="mensaje ok"><%= mensaje %></div><% } %>
+  <% if (error) { %><div class="mensaje error"><%= error %></div><% } %>
+
+  <div class="panel">
+    <div class="fila-filtro">
+      <div>
+        <h2 style="margin-bottom:2px">Despachar desde <%= bodega.nombre %></h2>
+        <p class="ayuda" style="margin:0">La mercancía sale de la bodega y entra al almacén que la recibe.</p>
+      </div>
+      <a class="btn linea" style="margin-left:auto" href="/almacen/bodega">Ver el inventario</a>
+    </div>
+  </div>
+
+  <%- include('../partials/traslado_form', { destinos, hoy, origenNombre: bodega.nombre }) %>
+
+  <div class="panel">
+    <h3>Hojas de traslado de la bodega</h3>
+    <table class="tabla">
+      <thead>
+        <tr><th>N°</th><th>Fecha</th><th></th><th>Almacén</th><th class="n">Productos</th><th class="n">Unidades</th><th>Quién llevó</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% historial.forEach(t => { %>
+          <% const enviado = t.origen_id === bodega.id; %>
+          <tr<%= t.anulado ? ' class="anulada"' : '' %>>
+            <td><%= t.numero %></td>
+            <td><%= fechaISO(t.fecha) %></td>
+            <td><span class="chip <%= enviado ? 'envio' : 'recibo' %>"><%= enviado ? 'despachado' : 'recibido' %></span></td>
+            <td><%= enviado ? t.destino_nombre : t.origen_nombre %></td>
+            <td class="n"><%= t.lineas %></td>
+            <td class="n"><%= fmtCant(t.unidades) %></td>
+            <td><%= t.responsable || '—' %></td>
+            <td class="n">
+              <a class="btn linea mini" href="/almacen/traslados/imprimir/<%= t.id %>?auto=0">Ver hoja</a>
+              <% if (enviado && !t.anulado) { %>
+                <form method="post" action="/almacen/bodega/traslados/<%= t.id %>/anular" style="display:inline"
+                      onsubmit="return confirm('¿Anular este traslado? La mercancía vuelve a la bodega.')">
+                  <button class="btn peligro mini" type="submit">Anular</button>
+                </form>
+              <% } %>
+              <% if (t.anulado) { %><span class="chip">anulado</span><% } %>
+            </td>
+          </tr>
+        <% }) %>
+        <% if (historial.length === 0) { %>
+          <tr><td colspan="8" class="vacio">La bodega todavía no ha despachado nada.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+window.APP = {
+  productos: <%- JSON.stringify(productos.map(p => ({ id: p.id, nombre: p.nombre, unidad: p.unidad, existencias: Number(p.existencias), stock: p.controla_stock }))) %>,
+  origenFijo: <%= bodega.id %>,
+  endpoint: '/almacen/bodega/traslados'
+};
+</script>
+<script src="/js/traslado.js?v=<%= v %>"></script>
+</body>
+</html>
