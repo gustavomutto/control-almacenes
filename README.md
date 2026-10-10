@@ -29,8 +29,8 @@ administración y la ganancia se calcula solo para ellos.
 - **Cotizar**: calculadora de metros cuadrados para techos PVC (lámina, cornisa, omega,
   vigueta, ángulo y tornillos, con las mismas fórmulas del programa original) más productos
   sueltos. Las cotizaciones no mueven inventario.
-- **Facturas**: historial por día, reimprimir, **editar**, cambiar la forma de pago y anular
-  (al anular, el inventario se devuelve).
+- **Facturas**: historial por día con **filtro por forma de pago**, reimprimir, **editar**,
+  cambiar la forma de pago y anular (al anular, el inventario se devuelve).
 - **Productos**: catálogo con precio de venta, unidad y existencias; buscador, edición en la
   misma fila, entradas de mercancía y carga del inventario desde Excel (se descarga como está
   hoy, se llena y se sube). Nada de esto recarga la pantalla.
@@ -72,6 +72,21 @@ mismo historial.
 Ni siquiera un borrado real en la base de datos cambiaría una factura: la referencia al
 producto es `ON DELETE SET NULL`, así que la línea se quedaría con su descripción y su total,
 solo sin el enlace al producto. Aun así el sistema nunca borra productos: solo los desactiva.
+
+## Filtrar las facturas por forma de pago
+
+En «Facturas» hay un filtro al lado de la fecha: **Todas**, **Efectivo**, **Transferencia**,
+**Solo las mixtas** y **Sin forma de pago**.
+
+Una factura mixta —parte en efectivo, parte en transferencia— **sale en los dos filtros**, con su
+total completo y sin partirse; en la tabla va marcada con la etiqueta «mixta». Para que ese total
+no confunda, al filtrar aparece una tarjeta aparte, *«Entró en efectivo ese día»* (o en
+transferencia), que sí reparte las mixtas y dice cuánto dinero entró de verdad por esa vía. Es el
+mismo número del cuadre de caja.
+
+«Sin forma de pago» sirve para cazar las facturas a las que todavía no se les anotó cómo se
+pagaron, y el filtro se conserva al anotarlas desde ahí mismo. En cotizaciones el filtro no
+aparece, porque no tienen pago.
 
 ## Contar el dinero de la caja (arqueo)
 

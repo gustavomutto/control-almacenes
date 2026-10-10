@@ -659,25 +659,72 @@ router.post('/cotizar', express.json({ limit: '256kb' }), async (req, res) => {
 
 // ============================ HISTORIAL ============================
 
+// Filtrar el historial por cómo se pagó. Una factura mixta (parte efectivo, parte
+// transferencia) sale en los dos filtros: no se parte, se muestra completa en ambos.
+const FILTROS_PAGO = {
+  efectivo: {
+    nombre: 'Efectivo',
+    patron: '%efectiv%',
+    condicion: "EXISTS (SELECT 1 FROM documento_pagos p WHERE p.documento_id = d.id AND p.metodo ILIKE '%efectiv%')",
+  },
+  transferencia: {
+    nombre: 'Transferencia',
+    patron: '%transfer%',
+    condicion: "EXISTS (SELECT 1 FROM documento_pagos p WHERE p.documento_id = d.id AND p.metodo ILIKE '%transfer%')",
+  },
+  mixto: {
+    nombre: 'Mixtas',
+    patron: null,
+    condicion: '(SELECT COUNT(DISTINCT p.metodo) FROM documento_pagos p WHERE p.documento_id = d.id) > 1',
+  },
+  sin: {
+    nombre: 'Sin forma de pago',
+    patron: null,
+    condicion: 'NOT EXISTS (SELECT 1 FROM documento_pagos p WHERE p.documento_id = d.id)',
+  },
+};
+
 router.get('/documentos', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
   const fecha = req.query.fecha || hoyISO();
   const tipo = req.query.tipo === 'cotizacion' ? 'cotizacion' : 'factura';
+  // Las cotizaciones no tienen forma de pago, así que ahí el filtro no aplica.
+  const pago = tipo === 'factura' && FILTROS_PAGO[req.query.pago] ? req.query.pago : 'todos';
+  const filtro = FILTROS_PAGO[pago];
 
-  const [almacen, docs] = await Promise.all([
+  const [almacen, docs, porMetodo] = await Promise.all([
     cargarAlmacen(almacenId),
     pool.query(
       `SELECT d.*, u.nombre AS vendedor,
               (SELECT string_agg(p.metodo || ': ' || to_char(p.valor,'FM999G999G999'), ', ')
-                 FROM documento_pagos p WHERE p.documento_id = d.id) AS pagos
+                 FROM documento_pagos p WHERE p.documento_id = d.id) AS pagos,
+              (SELECT COUNT(DISTINCT p.metodo) FROM documento_pagos p WHERE p.documento_id = d.id) AS formas
        FROM documentos d LEFT JOIN usuarios u ON u.id = d.registrado_por
        WHERE d.almacen_id = $1 AND d.fecha = $2 AND d.tipo = $3
+         ${filtro ? 'AND ' + filtro.condicion : ''}
        ORDER BY d.numero DESC`,
       [almacenId, fecha, tipo]
+    ),
+    // De lo cobrado ese día, cuánto entró por cada forma de pago (aquí las mixtas sí se
+    // reparten: la parte en efectivo suma en efectivo y la otra en transferencia).
+    pool.query(
+      `SELECT p.metodo, SUM(p.valor) AS valor
+         FROM documento_pagos p JOIN documentos d ON d.id = p.documento_id
+        WHERE d.almacen_id = $1 AND d.fecha = $2 AND d.tipo = 'factura' AND d.anulada = false
+        GROUP BY p.metodo ORDER BY p.metodo`,
+      [almacenId, fecha]
     ),
   ]);
 
   const total = docs.rows.filter((d) => !d.anulada).reduce((acc, d) => acc + Number(d.total), 0);
+
+  // Cuánto de ese dinero corresponde a la forma de pago filtrada.
+  const enEsteMetodo =
+    filtro && filtro.patron
+      ? porMetodo.rows
+          .filter((m) => new RegExp(filtro.patron.replace(/%/g, ''), 'i').test(m.metodo))
+          .reduce((acc, m) => acc + Number(m.valor), 0)
+      : null;
 
   res.render('almacen/documentos', {
     almacen,
@@ -685,6 +732,9 @@ router.get('/documentos', async (req, res) => {
     metodos: (almacen.metodos_pago || 'Efectivo,Transferencia').split(',').map((m) => m.trim()).filter(Boolean),
     fecha,
     tipo,
+    pago,
+    filtroNombre: filtro ? filtro.nombre : null,
+    enEsteMetodo,
     total,
     hoy: hoyISO(),
     activo: 'documentos',
@@ -753,7 +803,9 @@ router.get('/documentos/:id/editar', async (req, res) => {
 // Cambiar solo la forma de pago: no toca inventario ni totales, solo cómo se pagó.
 router.post('/documentos/:id/pagos', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
-  const volver = `/almacen/documentos?fecha=${req.body.fecha || hoyISO()}`;
+  const volver =
+    `/almacen/documentos?fecha=${req.body.fecha || hoyISO()}` +
+    (req.body.pago ? `&pago=${encodeURIComponent(req.body.pago)}` : '');
 
   const client = await pool.connect();
   try {

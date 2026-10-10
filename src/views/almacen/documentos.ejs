@@ -17,14 +17,52 @@
             <option value="cotizacion" <%= tipo === 'cotizacion' ? 'selected' : '' %>>Cotizaciones</option>
           </select>
         </label>
+        <% if (tipo === 'factura') { %>
+          <label class="campo">Forma de pago
+            <select name="pago" onchange="this.form.submit()">
+              <option value="todos" <%= pago === 'todos' ? 'selected' : '' %>>Todas</option>
+              <option value="efectivo" <%= pago === 'efectivo' ? 'selected' : '' %>>Efectivo</option>
+              <option value="transferencia" <%= pago === 'transferencia' ? 'selected' : '' %>>Transferencia</option>
+              <option value="mixto" <%= pago === 'mixto' ? 'selected' : '' %>>Solo las mixtas</option>
+              <option value="sin" <%= pago === 'sin' ? 'selected' : '' %>>Sin forma de pago</option>
+            </select>
+          </label>
+        <% } %>
         <label class="campo">Fecha <input type="date" name="fecha" value="<%= fecha %>" max="<%= hoy %>" onchange="this.form.submit()"></label>
       </form>
     </div>
 
     <div class="tarjetas">
-      <div class="tarjeta venta"><span>Total del día</span><strong><%= fmt(total) %></strong></div>
-      <div class="tarjeta"><span>Documentos</span><strong><%= documentos.filter(d => !d.anulada).length %></strong></div>
+      <div class="tarjeta venta">
+        <span><%= pago === 'todos' ? 'Total del día' : 'Total de estas facturas' %></span>
+        <strong><%= fmt(total) %></strong>
+      </div>
+      <div class="tarjeta">
+        <span><%= pago === 'todos' ? 'Documentos' : 'Facturas que coinciden' %></span>
+        <strong><%= documentos.filter(d => !d.anulada).length %></strong>
+      </div>
+      <% if (enEsteMetodo !== null) { %>
+        <div class="tarjeta margen">
+          <span>Entró en <%= filtroNombre.toLowerCase() %> ese día</span>
+          <strong><%= fmt(enEsteMetodo) %></strong>
+        </div>
+      <% } %>
     </div>
+
+    <% if (pago !== 'todos') { %>
+      <p class="ayuda" style="margin:0 0 14px">
+        <% if (pago === 'efectivo' || pago === 'transferencia') { %>
+          Estás viendo las facturas que tienen algo pagado en <b><%= filtroNombre.toLowerCase() %></b>.
+          Las mixtas aparecen aquí y también en el otro filtro, con su total completo; la tarjeta
+          verde sí separa solo la parte que entró en <%= filtroNombre.toLowerCase() %>.
+        <% } else if (pago === 'mixto') { %>
+          Solo las facturas que se pagaron con <b>más de una forma de pago</b>.
+        <% } else { %>
+          Facturas a las que todavía <b>no se les anotó</b> cómo se pagaron.
+        <% } %>
+        <a href="/almacen/documentos?fecha=<%= fecha %>">Ver todas</a>
+      </p>
+    <% } %>
 
     <table class="tabla">
       <thead>
@@ -33,13 +71,17 @@
       <tbody>
         <% documentos.forEach(d => { %>
           <tr<%= d.anulada ? ' class="anulada"' : '' %>>
-            <td><%= d.numero %><%= d.anulada ? ' (anulada)' : '' %></td>
+            <td>
+              <%= d.numero %><%= d.anulada ? ' (anulada)' : '' %>
+              <% if (tipo === 'factura' && Number(d.formas) > 1) { %><small class="etiqueta">mixta</small><% } %>
+            </td>
             <td><%= d.cliente || 'Consumidor final' %></td>
             <td><%= d.vendedor || '—' %></td>
             <td>
               <% if (tipo === 'factura' && d.editable) { %>
                 <form method="post" action="/almacen/documentos/<%= d.id %>/pagos" class="pago-rapido">
                   <input type="hidden" name="fecha" value="<%= fecha %>">
+                  <input type="hidden" name="pago" value="<%= pago %>">
                   <select name="metodo_1">
                     <% metodos.forEach(m => { %><option <%= (d.pagos || '').startsWith(m) ? 'selected' : '' %>><%= m %></option><% }) %>
                   </select>
@@ -73,7 +115,13 @@
           </tr>
         <% }) %>
         <% if (documentos.length === 0) { %>
-          <tr><td colspan="6" class="vacio">No hay <%= tipo === 'factura' ? 'facturas' : 'cotizaciones' %> este día.</td></tr>
+          <tr><td colspan="6" class="vacio">
+            <% if (pago === 'todos') { %>
+              No hay <%= tipo === 'factura' ? 'facturas' : 'cotizaciones' %> este día.
+            <% } else { %>
+              Ninguna factura de este día coincide con el filtro «<%= filtroNombre %>».
+            <% } %>
+          </td></tr>
         <% } %>
       </tbody>
     </table>
