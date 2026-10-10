@@ -194,3 +194,24 @@ tr.anulada td{opacity:.55;text-decoration:line-through}
 .tabla-cajas tr.fila-caja.sin-venta td{color:var(--steel)}
 .tabla-cajas .sangria{font-weight:500}
 .tabla-cajas tfoot td{font-weight:700;background:#EEF3F7}
+
+/* ---- Contar el dinero de la caja (arqueo) ---- */
+.arqueo{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:start}
+.arqueo-conteo{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.tabla-arqueo input{width:90px}
+.tabla-arqueo td{padding:6px 10px}
+.tabla-arqueo td.suave{color:var(--steel)}
+.tabla-cuadre td{padding:8px 10px}
+.tabla-cuadre tr.cuadre-fuerte td{font-weight:700;border-top:1px solid var(--line)}
+.tabla-cuadre tr.cuadre-dif td{font-weight:800;font-size:16px;border-top:2px solid var(--line)}
+.tabla-cuadre tr.cuadre-dif.falta td{color:var(--red);background:#FDECEA}
+.tabla-cuadre tr.cuadre-dif.sobra td{color:#8A5A00;background:#FDF5E2}
+.tabla-cuadre tr.cuadre-dif.cuadra td{color:var(--green);background:#E9F7EC}
+@media (max-width:900px){.arqueo{grid-template-columns:1fr}}
+
+/* ---- Arqueo en el cierre impreso ---- */
+.tk-arqueo{margin-top:6px}
+.tabla td.falta{color:var(--red);font-weight:700}
+.tabla td.sobra{color:#8A5A00;font-weight:700}
+.tabla td.cuadra{color:var(--green);font-weight:700}
+.tabla-arqueo td:first-child,.tabla-arqueo th:first-child{white-space:nowrap}

@@ -16,11 +16,23 @@ function tipoDePago(metodo) {
 }
 
 function vacio() {
-  return { venta: 0, facturas: 0, efectivo: 0, transferencia: 0, otros: 0, gastos: 0, entregar: 0 };
+  return {
+    venta: 0,
+    facturas: 0,
+    efectivo: 0,
+    transferencia: 0,
+    otros: 0,
+    gastos: 0,
+    entregar: 0,
+    // Conteo físico del cajón, cuando la caja lo hizo (ver lib/arqueo.js).
+    arqueos: 0,
+    contado: 0,
+    diferencia: 0,
+  };
 }
 
 function acumular(destino, origen) {
-  for (const k of ['venta', 'facturas', 'efectivo', 'transferencia', 'otros', 'gastos']) {
+  for (const k of ['venta', 'facturas', 'efectivo', 'transferencia', 'otros', 'gastos', 'arqueos', 'contado', 'diferencia']) {
     destino[k] += origen[k];
   }
   destino.entregar = destino.efectivo - destino.gastos;
@@ -30,7 +42,7 @@ function acumular(destino, origen) {
 async function resumenCajas(pool, { desde, hasta }) {
   const rango = [desde, hasta];
 
-  const [almacenes, usuarios, ventas, pagos, gastos] = await Promise.all([
+  const [almacenes, usuarios, ventas, pagos, gastos, arqueos] = await Promise.all([
     pool.query(
       `SELECT a.id, a.nombre, r.nombre AS region_nombre
          FROM almacenes a LEFT JOIN regiones r ON r.id = a.region_id
@@ -58,6 +70,13 @@ async function resumenCajas(pool, { desde, hasta }) {
       `SELECT almacen_id, registrado_por, COALESCE(SUM(valor),0) AS valor
          FROM gastos WHERE fecha BETWEEN $1 AND $2
         GROUP BY almacen_id, registrado_por`,
+      rango
+    ),
+    pool.query(
+      `SELECT almacen_id, usuario_id, COUNT(*) AS conteos,
+              COALESCE(SUM(contado),0) AS contado, COALESCE(SUM(diferencia),0) AS diferencia
+         FROM arqueos WHERE fecha BETWEEN $1 AND $2
+        GROUP BY almacen_id, usuario_id`,
       rango
     ),
   ]);
@@ -91,13 +110,19 @@ async function resumenCajas(pool, { desde, hasta }) {
   for (const g of gastos.rows) {
     caja(g.almacen_id, g.registrado_por).gastos += Number(g.valor);
   }
+  for (const a of arqueos.rows) {
+    const c = caja(a.almacen_id, a.usuario_id);
+    c.arqueos += Number(a.conteos);
+    c.contado += Number(a.contado);
+    c.diferencia += Number(a.diferencia);
+  }
 
   const filas = almacenes.rows.map((a) => {
     const movidas = [...(cajones.get(a.id) || new Map()).values()];
 
     // Las cajas del almacén que no movieron nada también se muestran (con ceros) cuando el
     // almacén sí tuvo movimiento: así se ve de una quién no facturó.
-    const hayMovimiento = movidas.some((c) => c.venta !== 0 || c.gastos !== 0);
+    const hayMovimiento = movidas.some((c) => c.venta !== 0 || c.gastos !== 0 || c.arqueos !== 0);
     const idsConMovimiento = new Set(movidas.map((c) => c.usuarioId));
     if (hayMovimiento) {
       for (const u of usuarios.rows) {
@@ -138,6 +163,8 @@ async function resumenCajas(pool, { desde, hasta }) {
     // Para avisar en la pantalla qué nombres de pago entraron en «otros».
     otrosMetodos: [...metodosVistos.entries()].filter(([, t]) => t === 'otros').map(([m]) => m),
     conOtros: totales.otros !== 0,
+    // Solo se muestran las columnas del conteo si alguien contó su cajón en estas fechas.
+    conArqueo: totales.arqueos > 0,
   };
 }
 

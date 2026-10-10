@@ -225,3 +225,27 @@ CREATE INDEX IF NOT EXISTS idx_documentos_almacen_fecha ON documentos (almacen_i
 CREATE INDEX IF NOT EXISTS idx_documentos_tipo ON documentos (almacen_id, tipo, numero);
 CREATE INDEX IF NOT EXISTS idx_items_documento ON documento_items (documento_id);
 CREATE INDEX IF NOT EXISTS idx_pagos_documento ON documento_pagos (documento_id);
+
+-- ===================== ARQUEO DE CAJA =====================
+-- El conteo físico de billetes y monedas al cerrar el día. Uno por almacén, día y caja
+-- (cada usuario que factura cuenta su propio cajón). Guardar de nuevo reemplaza el anterior.
+CREATE TABLE IF NOT EXISTS arqueos (
+  id SERIAL PRIMARY KEY,
+  almacen_id INTEGER NOT NULL REFERENCES almacenes(id) ON DELETE CASCADE,
+  fecha DATE NOT NULL,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  -- Con qué dinero amaneció la caja (el fondo fijo). No es venta.
+  base NUMERIC(14,2) NOT NULL DEFAULT 0,
+  -- {"100000": 3, "50000": 2, ...}: cuántos billetes/monedas de cada denominación.
+  detalle JSONB NOT NULL DEFAULT '{}'::jsonb,
+  contado NUMERIC(14,2) NOT NULL DEFAULT 0,
+  esperado NUMERIC(14,2) NOT NULL DEFAULT 0,
+  diferencia NUMERIC(14,2) NOT NULL DEFAULT 0,
+  nota TEXT,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE arqueos DROP CONSTRAINT IF EXISTS arqueos_unico;
+ALTER TABLE arqueos ADD CONSTRAINT arqueos_unico UNIQUE (almacen_id, fecha, usuario_id);
+CREATE INDEX IF NOT EXISTS idx_arqueos_almacen_fecha ON arqueos (almacen_id, fecha);

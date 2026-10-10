@@ -49,6 +49,7 @@
           <% if (resumen.conOtros) { %><th class="n">Otros pagos</th><% } %>
           <th class="n">Gastos</th>
           <th class="n">Efectivo a entregar</th>
+          <% if (resumen.conArqueo) { %><th class="n">Contado</th><th class="n">Diferencia</th><% } %>
         </tr>
       </thead>
       <tbody>
@@ -68,6 +69,12 @@
             <% if (resumen.conOtros) { %><td class="n"><%= fmt(f.total.otros) %></td><% } %>
             <td class="n"><%= fmt(f.total.gastos) %></td>
             <td class="n"><b><%= fmt(f.total.entregar) %></b></td>
+            <% if (resumen.conArqueo) { %>
+              <td class="n"><%= f.total.arqueos ? fmt(f.total.contado) : '—' %></td>
+              <td class="n <%= f.total.arqueos ? (f.total.diferencia < 0 ? 'falta' : f.total.diferencia > 0 ? 'sobra' : 'cuadra') : '' %>">
+                <%= f.total.arqueos ? (f.total.diferencia === 0 ? 'Cuadra' : (f.total.diferencia > 0 ? '+ ' : '- ') + fmt(Math.abs(f.total.diferencia))) : '—' %>
+              </td>
+            <% } %>
           </tr>
           <% f.cajas.forEach(c => { %>
             <tr class="fila-caja<%= c.venta === 0 && c.gastos === 0 ? ' sin-venta' : '' %>">
@@ -83,11 +90,17 @@
               <% if (resumen.conOtros) { %><td class="n"><%= fmt(c.otros) %></td><% } %>
               <td class="n"><%= fmt(c.gastos) %></td>
               <td class="n"><%= fmt(c.entregar) %></td>
+              <% if (resumen.conArqueo) { %>
+                <td class="n"><%= c.arqueos ? fmt(c.contado) : '—' %></td>
+                <td class="n <%= c.arqueos ? (c.diferencia < 0 ? 'falta' : c.diferencia > 0 ? 'sobra' : 'cuadra') : '' %>">
+                  <%= c.arqueos ? (c.diferencia === 0 ? 'Cuadra' : (c.diferencia > 0 ? '+ ' : '- ') + fmt(Math.abs(c.diferencia))) : '—' %>
+                </td>
+              <% } %>
             </tr>
           <% }) %>
         <% }) %>
         <% if (conMovimiento === 0) { %>
-          <tr><td colspan="<%= resumen.conOtros ? 8 : 7 %>" class="vacio">
+          <tr><td colspan="<%= (resumen.conOtros ? 8 : 7) + (resumen.conArqueo ? 2 : 0) %>" class="vacio">
             Ningún almacén movió caja en <%= desde === hasta ? 'esta fecha' : 'estas fechas' %>.
           </td></tr>
         <% } %>
@@ -103,6 +116,12 @@
             <% if (resumen.conOtros) { %><td class="n"><%= fmt(resumen.totales.otros) %></td><% } %>
             <td class="n"><%= fmt(resumen.totales.gastos) %></td>
             <td class="n"><%= fmt(resumen.totales.entregar) %></td>
+            <% if (resumen.conArqueo) { %>
+              <td class="n"><%= fmt(resumen.totales.contado) %></td>
+              <td class="n <%= resumen.totales.diferencia < 0 ? 'falta' : resumen.totales.diferencia > 0 ? 'sobra' : 'cuadra' %>">
+                <%= resumen.totales.diferencia === 0 ? 'Cuadra' : (resumen.totales.diferencia > 0 ? '+ ' : '- ') + fmt(Math.abs(resumen.totales.diferencia)) %>
+              </td>
+            <% } %>
           </tr>
         </tfoot>
       <% } %>
@@ -123,6 +142,10 @@
         En «Otros pagos» entró lo cobrado como <%= resumen.otrosMetodos.join(', ') %>.
       <% } %>
       Las facturas anuladas no cuentan, y las bodegas no aparecen porque no venden.
+      <% if (resumen.conArqueo) { %>
+        «Contado» es el dinero que la caja contó físicamente (incluida su base), y «Diferencia»
+        es cuánto le faltó o le sobró frente a lo que debía haber.
+      <% } %>
     </p>
   </div>
 </main>

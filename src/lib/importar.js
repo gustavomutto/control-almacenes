@@ -224,6 +224,8 @@ function cajasExcel(resumen, { desde, hasta }) {
     otros: Math.round(c.otros),
     gastos: Math.round(c.gastos),
     efectivo_a_entregar: Math.round(c.entregar),
+    contado: c.arqueos ? Math.round(c.contado) : '',
+    diferencia: c.arqueos ? Math.round(c.diferencia) : '',
     _total: esTotal || false,
   });
 
@@ -250,6 +252,8 @@ function cajasExcel(resumen, { desde, hasta }) {
     { wch: 12 },
     { wch: 12 },
     { wch: 20 },
+    { wch: 14 },
+    { wch: 12 },
   ];
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Cajas');

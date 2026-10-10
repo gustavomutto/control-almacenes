@@ -36,6 +36,101 @@
     </table>
   </div>
 
+  <div class="panel" id="panelArqueo">
+    <div class="fila-filtro">
+      <div>
+        <h3 style="margin-bottom:2px">Contar el dinero de la caja</h3>
+        <p class="ayuda" style="margin:0">
+          Anota cuántos billetes y cuántas monedas hay de cada uno. El sistema suma y te dice si
+          cuadra con lo que debería haber.
+        </p>
+      </div>
+    </div>
+
+    <div id="avisoArqueo" class="mensaje ok" hidden></div>
+
+    <div class="arqueo">
+      <div class="arqueo-conteo">
+        <table class="tabla tabla-arqueo">
+          <thead><tr><th>Billetes</th><th class="n">Cuántos</th><th class="n">Suman</th></tr></thead>
+          <tbody>
+            <% denominaciones.billetes.forEach(d => { %>
+              <tr>
+                <td><%= fmt(d.valor) %></td>
+                <td class="n"><input class="in n" type="number" min="0" step="1" inputmode="numeric"
+                  data-denominacion="<%= d.valor %>"
+                  value="<%= arqueo && arqueo.detalle[d.valor] ? arqueo.detalle[d.valor] : '' %>" placeholder="0"></td>
+                <td class="n" data-sub="<%= d.valor %>"><%= fmt(0) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+
+        <table class="tabla tabla-arqueo">
+          <thead><tr><th>Monedas</th><th class="n">Cuántas</th><th class="n">Suman</th></tr></thead>
+          <tbody>
+            <% denominaciones.monedas.forEach(d => { %>
+              <tr>
+                <td><%= fmt(d.valor) %></td>
+                <td class="n"><input class="in n" type="number" min="0" step="1" inputmode="numeric"
+                  data-denominacion="<%= d.valor %>"
+                  value="<%= arqueo && arqueo.detalle[d.valor] ? arqueo.detalle[d.valor] : '' %>" placeholder="0"></td>
+                <td class="n" data-sub="<%= d.valor %>"><%= fmt(0) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="arqueo-cuadre">
+        <label class="campo">Base con la que abrió la caja
+          <input class="in n" type="number" id="arqueoBase" min="0" step="1"
+                 value="<%= arqueo ? arqueo.base : 0 %>">
+        </label>
+        <p class="ayuda" style="margin:0 0 12px">
+          El fondo para dar vueltas. No es venta, pero está en el cajón, así que se suma a lo que
+          debería haber.
+        </p>
+
+        <table class="tabla tabla-cuadre">
+          <tbody>
+            <tr><td>Base</td><td class="n" id="cuadreBase"><%= fmt(arqueo ? arqueo.base : 0) %></td></tr>
+            <tr><td>Efectivo cobrado por esta caja</td><td class="n"><%= fmt(movido.efectivo) %></td></tr>
+            <tr><td>Gastos pagados de esta caja</td><td class="n"><%= movido.gastos ? '- ' + fmt(movido.gastos) : fmt(0) %></td></tr>
+            <tr class="cuadre-fuerte"><td>Debería haber</td><td class="n" id="cuadreEsperado"><%= fmt(0) %></td></tr>
+            <tr class="cuadre-fuerte"><td>Contado</td><td class="n" id="cuadreContado"><%= fmt(0) %></td></tr>
+            <tr class="cuadre-dif"><td>Diferencia</td><td class="n" id="cuadreDiferencia"><%= fmt(0) %></td></tr>
+          </tbody>
+        </table>
+
+        <p class="ayuda" id="arqueoVeredicto" style="margin:10px 0 0"></p>
+
+        <% if (resumen.entregar !== movido.entregar) { %>
+          <p class="ayuda" style="margin:6px 0 0">
+            Ojo: aquí estás contando <b>tu caja</b>. El almacén completo, sumando las otras cajas,
+            debe entregar <%= fmt(resumen.entregar) %>.
+          </p>
+        <% } %>
+
+        <label class="campo" style="margin-top:12px">Nota (opcional)
+          <input class="in" type="text" id="arqueoNota" maxlength="200"
+                 value="<%= arqueo && arqueo.nota ? arqueo.nota : '' %>"
+                 placeholder="Ej: faltan 2.000 del domicilio">
+        </label>
+
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn prim" type="button" id="guardarArqueo">Guardar conteo</button>
+          <button class="btn linea" type="button" id="limpiarArqueo">Limpiar</button>
+          <button class="btn peligro" type="button" id="borrarArqueo" <%= arqueo ? '' : 'hidden' %>>Borrar el conteo</button>
+        </div>
+
+        <p class="ayuda" style="margin-top:10px" id="arqueoGuardado">
+          <% if (arqueo) { %>Guardado. Sale impreso en el cierre y la administración lo ve.<% } %>
+        </p>
+      </div>
+    </div>
+  </div>
+
   <div class="panel">
     <h3>Gastos del día</h3>
     <form method="post" action="/almacen/gastos">
@@ -73,5 +168,13 @@
     </div>
   </div>
 </main>
+<script>
+  window.ARQUEO = {
+    fecha: '<%= fecha %>',
+    efectivo: <%= movido.efectivo %>,
+    gastos: <%= movido.gastos %>
+  };
+</script>
+<script src="/js/arqueo.js"></script>
 </body>
 </html>

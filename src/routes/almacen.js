@@ -16,6 +16,14 @@ const { crearTraslado, anularTraslado, cargarTraslado, listarTraslados } = requi
 const { movimientoDelDia, ultimosDias, movimientoExcel } = require('../lib/movimiento');
 const { inventarioExcel } = require('../lib/importar');
 const { revisarInventario, aplicarInventario, filasParaFormulario } = require('../lib/inventario');
+const {
+  BILLETES,
+  MONEDAS,
+  efectivoDeLaCaja,
+  leerArqueo,
+  guardarArqueo,
+  borrarArqueo,
+} = require('../lib/arqueo');
 
 const router = express.Router();
 
@@ -899,15 +907,63 @@ async function resumenCaja(almacenId, fecha) {
 
 router.get('/caja', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
+  const usuarioId = req.session.usuario.id;
   const fecha = req.query.fecha || hoyISO();
-  const [almacen, resumen] = await Promise.all([cargarAlmacen(almacenId), resumenCaja(almacenId, fecha)]);
+  const [almacen, resumen, arqueo, movido] = await Promise.all([
+    cargarAlmacen(almacenId),
+    resumenCaja(almacenId, fecha),
+    leerArqueo(pool, { almacenId, fecha, usuarioId }),
+    efectivoDeLaCaja(pool, { almacenId, fecha, usuarioId }),
+  ]);
   res.render('almacen/caja', {
     almacen,
     resumen,
+    arqueo,
+    movido,
+    denominaciones: { billetes: BILLETES, monedas: MONEDAS },
     fecha,
     hoy: hoyISO(),
     activo: 'caja',
     mensaje: req.query.ok || null,
+  });
+});
+
+// Contar el cajón. Se guarda sin recargar la pantalla; volver a guardar reemplaza el conteo.
+router.post('/caja/arqueo', express.json(), async (req, res) => {
+  const almacenId = req.session.usuario.almacenId;
+  const usuarioId = req.session.usuario.id;
+  const fecha = (req.body.fecha || hoyISO()).slice(0, 10);
+  const destino = '/almacen/caja?fecha=' + fecha;
+  try {
+    const arqueo = await guardarArqueo(pool, {
+      almacenId,
+      fecha,
+      usuarioId,
+      detalle: req.body.detalle || {},
+      base: req.body.base,
+      nota: req.body.nota,
+    });
+    responder(req, res, {
+      destino,
+      ok: 'Conteo guardado.',
+      json: { arqueo, mensaje: 'Conteo guardado.' },
+    });
+  } catch (err) {
+    responder(req, res, { destino, error: 'No se pudo guardar el conteo: ' + err.message });
+  }
+});
+
+router.post('/caja/arqueo/borrar', express.json(), async (req, res) => {
+  const fecha = (req.body.fecha || hoyISO()).slice(0, 10);
+  await borrarArqueo(pool, {
+    almacenId: req.session.usuario.almacenId,
+    fecha,
+    usuarioId: req.session.usuario.id,
+  });
+  responder(req, res, {
+    destino: '/almacen/caja?fecha=' + fecha,
+    ok: 'Conteo borrado.',
+    json: { mensaje: 'Conteo borrado.' },
   });
 });
 
@@ -1449,12 +1505,21 @@ router.get('/imprimir/:id', async (req, res) => {
 router.get('/caja/imprimir', async (req, res) => {
   const almacenId = req.session.usuario.almacenId;
   const fecha = req.query.fecha || hoyISO();
-  const [almacen, resumen] = await Promise.all([cargarAlmacen(almacenId), resumenCaja(almacenId, fecha)]);
+  const [almacen, resumen, arqueo] = await Promise.all([
+    cargarAlmacen(almacenId),
+    resumenCaja(almacenId, fecha),
+    leerArqueo(pool, { almacenId, fecha, usuarioId: req.session.usuario.id }),
+  ]);
+  const papel = papelEfectivo(req.session.usuario, almacen);
   res.render('imprimir_cierre', {
     almacen,
     resumen,
+    arqueo,
     fecha,
-    papelCss: papelCss(papelEfectivo(req.session.usuario, almacen)),
+    papel,
+    // En media carta y carta el cierre también tiene que caber en UNA hoja.
+    altoMaximo: ALTO_MAXIMO[papel] || 0,
+    papelCss: papelCss(papel),
     hora: horaTexto(),
     fechaTexto: fechaTexto(fecha),
     auto: req.query.auto !== '0',

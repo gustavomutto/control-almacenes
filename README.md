@@ -12,6 +12,7 @@ Sistema web para varios almacenes. Cada almacén tiene su propio sitio de factur
 | **Precio de costo y ganancia** | **No lo ve nunca** | Sí | Sí |
 | Reportes de todos los almacenes | No | Sí | Sí |
 | **Cajas de todos los almacenes (qué entregan)** | **Solo la suya** | Sí | Sí |
+| Contar los billetes y monedas del cajón | Sí (el suyo) | Ve el resultado | Ve el resultado |
 | Trasladar mercancía a otro almacén | Sí (desde el suyo) | Sí (desde cualquiera) | Sí (desde cualquiera) |
 | Manejar la bodega enlazada a su almacén | Sí (entradas y despachos) | Sí | Sí |
 | **Cuánto vale la mercancía de la bodega** | **No lo ve** | Sí | Sí |
@@ -36,8 +37,8 @@ administración y la ganancia se calcula solo para ellos.
 - **Traslados**: hoja para mandar mercancía a otro almacén, sin precios. Sale del inventario de
   aquí y entra al de allá.
 - **Movimiento**: qué material salió hoy —vendido, trasladado— y qué entró, imprimible.
-- **Caja**: cuadre del día por forma de pago, gastos del día y «efectivo a entregar»
-  (efectivo cobrado menos gastos), con cierre imprimible.
+- **Caja**: cuadre del día por forma de pago, gastos del día, «efectivo a entregar»
+  (efectivo cobrado menos gastos) y el **conteo de billetes y monedas**, con cierre imprimible.
 - **Mis datos**: encabezado, dirección, NIT, teléfono, nota al pie y formas de pago que salen
   impresos.
 
@@ -71,6 +72,33 @@ mismo historial.
 Ni siquiera un borrado real en la base de datos cambiaría una factura: la referencia al
 producto es `ON DELETE SET NULL`, así que la línea se quedaría con su descripción y su total,
 solo sin el enlace al producto. Aun así el sistema nunca borra productos: solo los desactiva.
+
+## Contar el dinero de la caja (arqueo)
+
+En «Caja», debajo del cuadre, está **«Contar el dinero de la caja»**: se anota cuántos billetes
+y cuántas monedas hay de cada denominación colombiana (100.000, 50.000, 20.000, 10.000, 5.000 y
+2.000 en billetes; 1.000, 500, 200, 100 y 50 en monedas) y el sistema va sumando mientras se
+escribe, sin recargar nada. `Enter` salta a la siguiente casilla, como una calculadora.
+
+Al lado aparece la cuenta:
+
+```
+  Base con la que abrió la caja      (el fondo para dar vueltas)
++ Efectivo cobrado por esta caja
+− Gastos pagados de esta caja
+= Debería haber
+  Contado                            (lo que acabas de contar)
+= Diferencia                         (verde si cuadra, rojo si falta, ámbar si sobra)
+```
+
+La transferencia no entra: ese dinero ya está en el banco, no en el cajón. Si el almacén tiene
+más de una caja, cada cajero cuenta **su propio cajón** y la pantalla se lo recuerda, diciéndole
+además cuánto debe entregar el almacén completo.
+
+El conteo se guarda por almacén, día y caja —volver a guardar reemplaza el anterior, y hay botón
+para borrarlo—, sale impreso en el cierre de caja (con la letra encogida si hace falta, para que
+nunca se vaya a una segunda hoja) y la administración lo ve en su pantalla «Cajas», en las
+columnas **Contado** y **Diferencia**.
 
 ## Cajas de todos los almacenes (administración)
 
@@ -381,6 +409,7 @@ src/
   lib/impresion.js                 reglas de papel (media carta / carta / 80mm / 58mm)
   lib/inventario.js                cargar inventario desde Excel (con o sin costos)
   lib/reparar.js                   arreglo de precios invertidos y recálculo de facturas
+  lib/arqueo.js                    conteo de billetes y monedas de la caja
   lib/cajas.js                     cajas de todos los almacenes (lo que entregan)
   lib/traslados.js                 mercancía que pasa de un almacén a otro
   lib/movimiento.js                material vendido, trasladado y recibido en el día
@@ -400,6 +429,7 @@ public/js/pos.js                    pantalla de venta
 public/js/cotizar.js                pantalla de cotización
 public/js/espera.js                 varias facturas abiertas a la vez
 public/js/catalogo.js               productos y bodega sin recargar (buscador y edición)
+public/js/arqueo.js                 contar los billetes y monedas de la caja
 ```
 
 ## Desplegar en Railway

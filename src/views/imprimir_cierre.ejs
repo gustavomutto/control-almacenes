@@ -49,10 +49,50 @@
         <span class="tk-grande">EFECTIVO A ENTREGAR</span><span class="r tk-grande"><%= fmt(resumen.entregar) %></span>
       </div>
 
+      <% if (arqueo) { %>
+        <div class="tk-cuadre tk-arqueo">
+          <i class="tk-sep"></i>
+          <span>CONTEO DEL CAJÓN</span><span></span>
+          <% arqueo.lineas.forEach(l => { %>
+            <span class="ind suave"><%= fmt(l.valor) %> × <%= l.cantidad %></span>
+            <span class="r suave"><%= fmt(l.subtotal) %></span>
+          <% }) %>
+          <% if (arqueo.lineas.length === 0) { %>
+            <span class="ind suave">Sin billetes ni monedas</span><span></span>
+          <% } %>
+          <% if (arqueo.base) { %>
+            <span class="ind suave">Base del día</span><span class="r suave"><%= fmt(arqueo.base) %></span>
+          <% } %>
+          <span>CONTADO</span><span class="r"><%= fmt(arqueo.contado) %></span>
+          <span class="ind suave">Debería haber</span><span class="r suave"><%= fmt(arqueo.esperado) %></span>
+          <span class="tk-grande">
+            <%= arqueo.diferencia === 0 ? 'CUADRA' : arqueo.diferencia < 0 ? 'FALTA' : 'SOBRA' %>
+          </span>
+          <span class="r tk-grande"><%= fmt(Math.abs(arqueo.diferencia)) %></span>
+          <% if (arqueo.nota) { %><span class="ind suave"><%= arqueo.nota %></span><span></span><% } %>
+        </div>
+      <% } %>
+
       <div class="tk-firmas"><div>Entregado por</div><div>Recibido por</div></div>
     </div>
   </div>
 
+<script>
+// Misma red de seguridad que la factura: con el conteo del cajón el cierre se alarga, y
+// un milímetro de más se iba a una segunda hoja que la impresora reporta como atasco.
+// Si se pasa del alto que de verdad imprime la máquina, se encoge la letra.
+(function ajustarAlaHoja() {
+  var tope = <%= altoMaximo %>;
+  var tk = document.querySelector('#print-area .tk');
+  if (!tk || !tope) return;
+  var limite = tope * 96 / 25.4; // milímetros a pixeles
+  var tam = parseFloat(getComputedStyle(tk).fontSize);
+  for (var i = 0; i < 60 && tk.getBoundingClientRect().height > limite + 1 && tam > 5; i++) {
+    tam -= 0.25;
+    tk.style.fontSize = tam + 'px';
+  }
+})();
+</script>
 <% if (auto) { %>
 <script>window.addEventListener('load', () => setTimeout(() => window.print(), 350));</script>
 <% } %>
